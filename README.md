@@ -32,6 +32,7 @@ python -m src.main        # command-line demo with four user profiles
 python evaluation.py      # metrics and guardrail checks (exit code 1 on failure)
 python -m pytest          # automated test suite
 python -m experiments.run_v1  # compare baselines and run the v1 ablation study
+python -m experiments.run_v2  # tune weights and measure sensitivity
 ```
 
 ## Streamlit App (`app.py`)
@@ -92,6 +93,13 @@ Run `python -m experiments.run_v1` to compare the recommender with simple baseli
 
 The full system has the best average NDCG and a hit rate of 1.00 in this evaluation, but only seven listeners were labelled and the confidence intervals overlap. Treat this as an encouraging signal, not proof of general performance. The ablation suggests mood, genre, and energy contribute most to relevance; the diversity penalty and retrieval filter primarily improve variety and efficiency here.
 
+## Weight Tuning and Sensitivity (v2)
+Run `python -m experiments.run_v2` to compare the current weights with a deterministic random search over 800 configurations, evaluate tuning with leave-one-listener-out validation, and measure sensitivity to individual and joint weight changes. Outputs are saved to `reports/v2_results.md` and `reports/v2_sensitivity.png`.
+
+The best configuration scored 0.62 NDCG@5 on all seven listeners, compared with 0.59 for the current weights. However, tuning on six listeners and evaluating on the held-out listener scored 0.56 versus 0.59 for the current weights. This suggests the apparent in-sample gain overfits the small evaluation set, so the project keeps its existing weights. The results are indicative, not conclusive, with only seven hand-labelled listeners. Sensitivity analysis shows mood and energy weights have the greatest effect; the full ranges and methodology are in the [v2 report](reports/v2_results.md) and [model card](model_card.md).
+
+![Weight sensitivity and perturbation results](reports/v2_sensitivity.png)
+
 ## Reliability & Testing
 `tests/` includes parametrized reliability checks across six profiles and four values of `k`, as well as checks for:
 - exactly `k` unique, score-sorted, explained results, including rare combinations and total mismatches;
@@ -103,7 +111,8 @@ The full system has the best average NDCG and a hit rate of 1.00 in this evaluat
 - both CSVs load with valid value ranges;
 - detailed score breakdowns agree with the final scores;
 - baseline implementations and evaluation metrics behave correctly;
-- the v1 experiment and report cover baseline comparisons and ablations.
+- the v1 experiment and report cover baseline comparisons and ablations;
+- weight sampling is reproducible, ties prefer configurations near the defaults, and leave-one-listener-out validation excludes the held-out listener.
 
 ## Design Decisions and Trade-offs
 - **Interpretability over accuracy:** simple weights and rule-based explanations, at the cost of no collaborative filtering or learned taste.
