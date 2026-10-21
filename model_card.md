@@ -1,0 +1,60 @@
+# 🎧 Model Card: Music Recommender Simulation
+
+## 1. Model Name
+
+**VibeFinder 1.0**
+
+---
+
+## 2. Intended Use
+
+This recommender suggests songs based on your mood, favorite genre, and energy level. It is designed for classroom learning and exploring how music recommenders work. It is not meant for real-world music streaming or commercial use.
+
+---
+
+## 3. How the Model Works
+
+The model looks at your favorite genre, mood, and how much energy you want in a song. It scores each song higher if it matches your genre or mood, and if its energy is close to your target. It also considers if you like acoustic music, and, if you supply them, targets for valence, danceability and tempo. Retrieval first narrows the catalog and relaxes the filter until at least k songs are available; a diversity penalty then discourages repeated artists. The top scoring songs are recommended to you. The scoring rules are simple and use only a few features.
+
+---
+
+## 4. Data
+
+`data/songs.csv` has 50 songs by 48 artists across 27 genres (e.g. afrobeats, fuji, apala, pop, lofi, jazz). Each song has genre, mood, energy, tempo, valence, danceability and acousticness. Most genres have only one to four songs, so many tastes are thinly covered. `data/songs_new.csv` is a separate 20-song sample with extra optional columns (popularity, decade, detailed mood, instrumentalness, language) that the scorer supports but the main catalog lacks.
+
+---
+
+## 5. Strengths
+
+The system works well for users who like popular genres and common moods. It gives good results when your preferences match the songs in the dataset. The recommendations make sense for typical cases, like happy pop or chill lofi fans.
+
+---
+
+## 6. Limitations and Bias
+
+One weakness discovered during testing is that the system can over-prioritize certain genres, such as pop or rock, if they are more common in the dataset. Users whose favorite genre or mood is not present in the data will rarely receive high-scoring recommendations, regardless of their other preferences. The current scoring logic also heavily rewards close matches on energy, which can create a filter bubble and limit variety for users with extreme or uncommon energy preferences. Valence, danceability and tempo only count when the user supplies them as targets, so profiles that give only genre, mood and energy ignore them. These factors can lead to biased recommendations and reduced diversity in the results.
+
+---
+
+## 7. Evaluation
+
+For evaluation, I tested a variety of user profiles, including typical cases (e.g., pop/happy/high energy) and adversarial or edge cases (such as high energy with sad mood, or genres/moods not present in the dataset). I looked for whether the top recommendations matched the user's stated preferences and if the same songs appeared repeatedly. One surprise was how strongly the system favored songs that matched genre and energy, sometimes at the expense of mood or other features. For users with rare or conflicting preferences, the recommendations were often less relevant or repetitive, highlighting the system's sensitivity to dataset composition and scoring weights.
+
+---
+
+### Results (`python evaluation.py`, 7 profiles, k=5)
+Mean genre match 0.40, mean mood match 0.43, mean artist diversity 1.00, catalog coverage 0.52. All guardrails passed (k results, no duplicates, explanations present). Genre match is lowest for rock, electronic and blues, which have one or two songs in the catalog, so the system fills the list with the nearest energy/mood matches. About 38 automated checks cover k-guarantees, edge cases, ranking quality, smooth energy scoring and diversity.
+
+## 8. Future Work
+
+I would add more features, like danceability and tempo, to make recommendations smarter. I would also try to make the results more diverse, so you see new songs sometimes. Finally, I would improve the explanations so users know why a song was picked.
+
+---
+
+## 9. Personal Reflection
+
+I learned that recommenders can be simple but still show patterns and biases. It was interesting to see how changing the weights or the data changed the results. This project made me think more about how music apps decide what to play next!
+
+## 10. Intended Use and Non-Intended Use
+
+This system is for learning and experimenting with music recommendation. It should not be used for real music streaming, commercial products, or making important decisions.

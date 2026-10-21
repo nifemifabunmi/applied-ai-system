@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VibeFinder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #edf0f5; --surface: #ffffff; --ink: #16213e; --muted: #566077; --line: #d3d9e4;
+  --field: #f6f8fb; --focus: #2d4bff;
+  --c-genre: #1f9a8a; --c-mood: #e0a030; --c-energy: #5b5fef; --c-sound: #d9567b; --c-penalty: #8a94a8;
+  --sans: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111828; --surface: #1a2338; --ink: #e8ecf6; --muted: #9aa5bd; --line: #2c3752;
+    --field: #141c2f; --focus: #8fa0ff;
+    --c-genre: #3cc1af; --c-mood: #f0b84e; --c-energy: #8d90ff; --c-sound: #ef7c9c; --c-penalty: #7d879d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111828; --surface: #1a2338; --ink: #e8ecf6; --muted: #9aa5bd; --line: #2c3752;
+  --field: #141c2f; --focus: #8fa0ff;
+  --c-genre: #3cc1af; --c-mood: #f0b84e; --c-energy: #8d90ff; --c-sound: #ef7c9c; --c-penalty: #7d879d;
+  color-scheme: dark;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+*, *::before, *::after { box-sizing: inherit; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1rem/1.5 var(--sans); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+
+.app { max-width: 1120px; margin: 0 auto; padding: 28px 20px 56px; }
+.top { margin-bottom: 24px; }
+.top h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.top p { margin: 8px 0 0; color: var(--muted); max-width: 52ch; font-size: 1.05rem; }
+
+.layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 820px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.panel, .rec { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.panel { padding: 20px; position: sticky; top: 16px; }
+@media (max-width: 820px) { .panel { position: static; } }
+.panel h2 { margin: 0 0 12px; font-size: 1.15rem; font-weight: 700; }
+
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.chipbtn { font: 500 0.85rem var(--sans); color: var(--ink); background: var(--field); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.chipbtn:hover { border-color: var(--ink); }
+.chipbtn[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+.field { display: block; margin-bottom: 16px; border: 0; padding: 0; min-width: 0; }
+.field > span, .field > legend { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; font-size: 0.92rem; margin-bottom: 6px; padding: 0; }
+.field output { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+select { width: 100%; font: 500 1rem var(--sans); color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+input[type="range"] { width: 100%; accent-color: var(--focus); margin: 4px 0; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg label { text-align: center; padding: 8px 6px; font-size: 0.92rem; font-weight: 500; cursor: pointer; background: var(--field); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg input:checked + span { font-weight: 700; }
+.seg label:has(input:checked) { background: var(--ink); color: var(--surface); }
+.seg label:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: -3px; }
+details.tune { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+details.tune summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; margin-bottom: 8px; }
+.tuneRow { margin-bottom: 12px; }
+.tuneRow .head { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 500; }
+.tuneRow .head output { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tuneRow input[type="range"]:disabled { opacity: 0.35; }
+.hint { color: var(--muted); font-size: 0.82rem; margin: 6px 0 0; }
+
+.pipeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-bottom: 16px; }
+.stage { background: var(--surface); border: 1px solid var(--line); padding: 12px 14px; position: relative; }
+.stage:first-child { border-radius: 14px 0 0 14px; }
+.stage:last-child { border-radius: 0 14px 14px 0; }
+.stage + .stage { border-left: 0; }
+.stage b { display: block; font-size: 1.5rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+.stage small { display: block; color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+@media (max-width: 560px) {
+  .pipeline { grid-template-columns: minmax(0, 1fr); }
+  .stage, .stage:first-child, .stage:last-child { border-radius: 0; border-left: 1px solid var(--line); }
+  .stage:first-child { border-radius: 14px 14px 0 0; }
+  .stage:last-child { border-radius: 0 0 14px 14px; }
+  .stage + .stage { border-top: 0; }
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; font-size: 0.85rem; color: var(--muted); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: baseline; }
+.legend .sw { vertical-align: -1px; }
+
+ol.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.rec { padding: 16px 18px; display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; column-gap: 12px; row-gap: 8px; }
+.rank { font-weight: 800; font-size: 1.6rem; line-height: 1; color: var(--muted); letter-spacing: -0.03em; padding-top: 2px; }
+.rec:first-child .rank { color: var(--ink); }
+.title { margin: 0; font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
+.artist { color: var(--muted); font-size: 0.95rem; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tag { font-size: 0.78rem; font-weight: 500; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+.tag.hit { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+.score { text-align: right; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+.score small { display: block; font-size: 0.72rem; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-top: 3px; }
+.bar { grid-column: 2 / -1; display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--field); border: 1px solid var(--line); }
+.bar i { display: block; height: 100%; transition: width 0.25s ease; }
+.parts { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.parts .neg .sw { background: repeating-linear-gradient(45deg, var(--c-penalty) 0 2px, transparent 2px 4px); outline: 1px solid var(--c-penalty); }
+.why { grid-column: 2 / -1; margin: 2px 0 0; font: 400 0.98rem/1.6 var(--serif); max-width: 68ch; }
+@media (max-width: 560px) {
+  .rec { grid-template-columns: 1.8rem minmax(0, 1fr); }
+  .score { grid-column: 2; grid-row: 2; text-align: left; display: flex; align-items: baseline; gap: 6px; }
+  .score small { display: inline; margin: 0; }
+  .bar, .parts, .why { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+.foot { margin-top: 24px; color: var(--muted); font-size: 0.85rem; max-width: 70ch; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>VibeFinder</h1>
+    <p>Describe your taste and see which songs fit, with the points behind every pick.</p>
+  </header>
+
+  <main class="layout">
+    <section class="panel" aria-labelledby="taste-h">
+      <h2 id="taste-h">Your taste</h2>
+      <div class="presets" id="presets" role="group" aria-label="Example tastes"></div>
+
+      <label class="field"><span>Genre</span><select id="genre"></select></label>
+      <label class="field"><span>Mood</span><select id="mood"></select></label>
+      <label class="field"><span>Energy <output id="energy-o"></output></span>
+        <input type="range" id="energy" min="0" max="1" step="0.05" value="0.8"></label>
+
+      <fieldset class="field"><legend>Acoustic sound</legend>
+        <div class="seg">
+          <label><input type="radio" name="acoustic" value="like"><span>Prefer it</span></label>
+          <label><input type="radio" name="acoustic" value="avoid" checked><span>Avoid it</span></label>
+        </div>
+      </fieldset>
+
+      <details class="tune">
+        <summary>Fine-tune the sound</summary>
+        <div id="tune"></div>
+        <p class="hint">Turn a slider on to add it to the score. Acousticness replaces the setting above.</p>
+      </details>
+
+      <label class="field" style="margin-top:16px"><span>Songs to show</span>
+        <select id="k"><option>3</option><option selected>5</option><option>10</option></select></label>
+    </section>
+
+    <section aria-labelledby="res-h">
+      <h2 id="res-h" style="position:absolute;left:-9999px">Recommendations</h2>
+      <div class="pipeline" id="pipeline" aria-live="polite"></div>
+      <div class="legend" id="legend"></div>
+      <ol class="list" id="list"></ol>
+      <p class="foot">Scores come from a transparent rule-based model, not machine learning. Each bar is split by what earned the points. Picks by an artist already in the list lose 0.70 points, so one artist can’t fill the page.</p>
+    </section>
+  </main>
+</div>
+
+<script>/*ENGINE*/</script>
+<script>
+const SONGS = /*SONGS*/;
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const MINUS = '\u2212';
+  const fmt = (n) => (n < 0 ? MINUS : '') + Math.abs(n).toFixed(2);
+
+  const PRESETS = [
+    { name: 'Upbeat pop', genre: 'pop', mood: 'happy', energy: 0.8, acoustic: 'avoid' },
+    { name: 'Study lofi', genre: 'lofi', mood: 'chill', energy: 0.4, acoustic: 'like' },
+    { name: 'Gym rock', genre: 'rock', mood: 'intense', energy: 0.95, acoustic: 'avoid' },
+    { name: 'Late-night jazz', genre: 'jazz', mood: 'relaxed', energy: 0.5, acoustic: 'like' },
+    { name: 'Sad but loud blues', genre: 'blues', mood: 'sad', energy: 0.9, acoustic: 'avoid' },
+  ];
+  const TUNE = [
+    { key: 'acousticness', label: 'Acousticness', min: 0, max: 1, step: 0.05, val: 0.5, f: (v) => v.toFixed(2) },
+    { key: 'valence', label: 'Positivity', min: 0, max: 1, step: 0.05, val: 0.6, f: (v) => v.toFixed(2) },
+    { key: 'danceability', label: 'Danceability', min: 0, max: 1, step: 0.05, val: 0.6, f: (v) => v.toFixed(2) },
+    { key: 'tempo_bpm', label: 'Tempo', min: 60, max: 180, step: 5, val: 110, f: (v) => v + ' bpm' },
+  ];
+  const GROUPS = [
+    { id: 'genre', label: 'Genre', color: 'var(--c-genre)', keys: ['genre'] },
+    { id: 'mood', label: 'Mood', color: 'var(--c-mood)', keys: ['mood'] },
+    { id: 'energy', label: 'Energy', color: 'var(--c-energy)', keys: ['energy'] },
+    { id: 'sound', label: 'Sound', color: 'var(--c-sound)', keys: ['acoustic', 'valence', 'danceability', 'tempo'] },
+  ];
+
+  const count = (key) => {
+    const m = {};
+    SONGS.forEach((s) => { m[s[key]] = (m[s[key]] || 0) + 1; });
+    return Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  };
+  const fillSelect = (el, key, anyLabel) => {
+    el.innerHTML = `<option value="">${anyLabel}</option>` +
+      count(key).map(([v, n]) => `<option value="${v}">${v} (${n})</option>`).join('');
+  };
+  fillSelect($('genre'), 'genre', 'Any genre');
+  fillSelect($('mood'), 'mood', 'Any mood');
+
+  $('tune').innerHTML = TUNE.map((t) => `
+    <div class="tuneRow">
+      <div class="head"><input type="checkbox" id="on-${t.key}" aria-label="Use ${t.label}">
+        <label for="on-${t.key}">${t.label}</label><output id="o-${t.key}">${t.f(t.val)}</output></div>
+      <input type="range" id="r-${t.key}" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.val}" disabled aria-label="${t.label} target">
+    </div>`).join('');
+
+  $('legend').innerHTML = GROUPS.map((g) => `<span><i class="sw" style="background:${g.color}"></i>${g.label}</span>`).join('');
+  $('presets').innerHTML = PRESETS.map((p, i) => `<button type="button" class="chipbtn" data-i="${i}" aria-pressed="false">${p.name}</button>`).join('');
+
+  function readPrefs() {
+    const prefs = {
+      genre: $('genre').value, mood: $('mood').value, energy: parseFloat($('energy').value),
+      likes_acoustic: document.querySelector('input[name=acoustic]:checked').value === 'like',
+    };
+    TUNE.forEach((t) => { if ($('on-' + t.key).checked) prefs[t.key] = parseFloat($('r-' + t.key).value); });
+    return prefs;
+  }
+
+  const TIER_TEXT = {
+    both: 'matched your genre and mood', either: 'matched your genre or mood (too few matched both)',
+    fallback: 'too few matches, so the whole catalog was used', all: 'no genre or mood chosen, so every song was considered',
+  };
+
+  function render() {
+    const prefs = readPrefs();
+    const k = parseInt($('k').value, 10);
+    $('energy-o').textContent = prefs.energy.toFixed(2);
+    const out = VibeEngine.recommend(prefs, SONGS, k);
+
+    $('pipeline').innerHTML = `
+      <div class="stage"><b>${SONGS.length}</b><small>songs in the catalog</small></div>
+      <div class="stage"><b>${out.poolSize}</b><small>candidates, ${TIER_TEXT[out.tier]}</small></div>
+      <div class="stage"><b>${out.results.length}</b><small>picks, with artists spread out</small></div>`;
+
+    const group = (r, g) => g.keys.reduce((s, key) => s + r.breakdown[key], 0);
+    const maxPos = Math.max(0.001, ...out.results.map((r) => GROUPS.reduce((s, g) => s + Math.max(0, group(r, g)), 0)));
+
+    $('list').innerHTML = out.results.map((r, i) => {
+      const s = r.song;
+      const segs = GROUPS.map((g) => ({ g, v: group(r, g) }));
+      const bar = segs.filter((x) => x.v > 0)
+        .map((x) => `<i style="width:${(x.v / maxPos) * 100}%;background:${x.g.color}" title="${x.g.label} ${fmt(x.v)}"></i>`).join('');
+      const parts = segs.filter((x) => Math.abs(x.v) > 0.004)
+        .map((x) => `<span class="${x.v < 0 ? 'neg' : ''}"><i class="sw" style="background:${x.v < 0 ? '' : x.g.color}"></i>${x.g.label} ${x.v < 0 ? MINUS : '+'}${Math.abs(x.v).toFixed(2)}</span>`);
+      if (r.penalty > 0.004) parts.push(`<span class="neg"><i class="sw"></i>Repeat artist ${MINUS}${r.penalty.toFixed(2)}</span>`);
+      return `<li class="rec">
+        <div class="rank" aria-hidden="true">${i + 1}</div>
+        <div>
+          <h3 class="title">${s.title}</h3>
+          <div class="artist">${s.artist}</div>
+          <div class="tags">
+            <span class="tag ${prefs.genre && s.genre === prefs.genre ? 'hit' : ''}">${s.genre}</span>
+            <span class="tag ${prefs.mood && s.mood === prefs.mood ? 'hit' : ''}">${s.mood}</span>
+            <span class="tag">energy ${s.energy.toFixed(2)}</span>
+          </div>
+        </div>
+        <div class="score">${fmt(r.adjusted)}<small>score</small></div>
+        <div class="bar" role="img" aria-label="Score breakdown">${bar}</div>
+        <div class="parts">${parts.join('')}</div>
+        <p class="why">${r.explanation}</p>
+      </li>`;
+    }).join('');
+  }
+
+  function applyPreset(i) {
+    const p = PRESETS[i];
+    $('genre').value = p.genre; $('mood').value = p.mood; $('energy').value = p.energy;
+    document.querySelector(`input[name=acoustic][value=${p.acoustic}]`).checked = true;
+    TUNE.forEach((t) => { $('on-' + t.key).checked = false; $('r-' + t.key).disabled = true; });
+    render(); markPreset(i);
+  }
+  const markPreset = (active) => document.querySelectorAll('.chipbtn').forEach((b) =>
+    b.setAttribute('aria-pressed', String(Number(b.dataset.i) === active)));
+
+  $('presets').addEventListener('click', (e) => { const b = e.target.closest('.chipbtn'); if (b) applyPreset(+b.dataset.i); });
+  document.querySelector('.panel').addEventListener('input', (e) => {
+    const t = e.target;
+    TUNE.forEach((x) => {
+      if (t.id === 'on-' + x.key) $('r-' + x.key).disabled = !t.checked;
+      if (t.id === 'r-' + x.key) $('o-' + x.key).textContent = x.f(parseFloat(t.value));
+    });
+    if (!t.closest('.presets')) markPreset(-1);
+    render();
+  });
+  applyPreset(0);
+})();
+</script>
+</body>
+</html>
