@@ -29,10 +29,14 @@ WEIGHTS = {
     "detailed_mood": 0.7,
     "instrumental": 0.5,
     "language": 0.3,
+    "similarity": 0.5,        # closeness to the user's liked songs (see reports/v3_results.md: small on purpose)
 }
 ENERGY_TOLERANCE = 0.5        # energy gap at which the bonus reaches 0
 TEMPO_TOLERANCE_BPM = 60.0    # tempo gap at which the bonus reaches 0
 ARTIST_REPEAT_PENALTY = 0.7   # subtracted per earlier pick by the same artist
+SIMILARITY_RADIUS = 1.0       # feature-space distance at which similarity reaches 0
+SIMILARITY_FEATURES = ("energy", "valence", "danceability", "acousticness")
+SIMILARITY_MODE = "nearest"   # "centroid": average sound of liked songs; "nearest": closest single liked song
 
 
 @dataclass
@@ -149,6 +153,42 @@ def _closeness(a: float, b: float, tolerance: float) -> float:
     return max(0.0, 1.0 - abs(a - b) / tolerance)
 
 
+def sound_vector(song: Dict) -> List[float]:
+    """A song's position in audio-feature space (all values roughly 0 to 1)."""
+    return [song[f] for f in SIMILARITY_FEATURES] + [song["tempo_bpm"] / 200.0]
+
+
+def taste_vector(liked_songs: List[Dict]) -> List[float]:
+    """Average sound of the songs a user already likes."""
+    vectors = [sound_vector(s) for s in liked_songs]
+    return [sum(col) / len(col) for col in zip(*vectors)]
+
+
+def sound_distance(a: List[float], b: List[float]) -> float:
+    return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+
+
+def similarity_to_taste(song: Dict, taste: List[float]) -> float:
+    """1.0 for a song that sounds exactly like the user's taste, falling to 0.0 at SIMILARITY_RADIUS."""
+    return max(0.0, 1.0 - sound_distance(sound_vector(song), taste) / SIMILARITY_RADIUS)
+
+
+def taste_similarity(song: Dict, prefs: Dict) -> float:
+    """Similarity (0 to 1) to the user's liked songs under the active SIMILARITY_MODE."""
+    liked = prefs.get("liked_songs") or []
+    if SIMILARITY_MODE == "nearest" and liked:
+        v = sound_vector(song)
+        return max(max(0.0, 1.0 - sound_distance(sound_vector(s), v) / SIMILARITY_RADIUS) for s in liked)
+    return similarity_to_taste(song, prefs["taste_vector"])
+
+
+def nearest_liked(song: Dict, liked_songs: List[Dict]) -> Optional[Dict]:
+    if not liked_songs:
+        return None
+    v = sound_vector(song)
+    return min(liked_songs, key=lambda s: sound_distance(sound_vector(s), v))
+
+
 def score_breakdown(song: Dict, prefs: Dict) -> Dict[str, float]:
     """
     Points contributed by each scoring component for one song (0.0 when a
@@ -158,7 +198,7 @@ def score_breakdown(song: Dict, prefs: Dict) -> Dict[str, float]:
     w = WEIGHTS
     parts = {k: 0.0 for k in (
         "genre", "mood", "energy", "acoustic", "valence", "danceability",
-        "tempo", "popularity", "decade", "detailed_mood", "instrumental", "language",
+        "tempo", "popularity", "decade", "detailed_mood", "instrumental", "language", "similarity",
     )}
 
     if prefs.get("genre") and song["genre"] == prefs["genre"]:
@@ -196,6 +236,9 @@ def score_breakdown(song: Dict, prefs: Dict) -> Dict[str, float]:
         parts["instrumental"] = song["instrumentalness"] * w["instrumental"]
     if prefs.get("language") and song.get("language") == prefs["language"]:
         parts["language"] = w["language"]
+    # Similarity to the user's liked songs (only when `taste_vector` was supplied).
+    if prefs.get("taste_vector"):
+        parts["similarity"] = w["similarity"] * taste_similarity(song, prefs)
     return parts
 
 
@@ -263,6 +306,12 @@ def explain_song(song: Dict, prefs: Dict, all_songs: Optional[List[Dict]] = None
         elif not prefs.get("likes_acoustic", False) and song["acousticness"] < 0.3:
             reasons.append("is not very acoustic, matching your preference")
 
+    if prefs.get("taste_vector") and taste_similarity(song, prefs) >= 0.6:
+        close = nearest_liked(song, prefs.get("liked_songs", []))
+        if close:
+            reasons.append(f"sounds like '{close['title']}', which you like")
+        else:
+            reasons.append("sounds like the songs you like")
     if prefs.get("release_decade") and song.get("release_decade") == prefs["release_decade"]:
         reasons.append(f"is from the {song['release_decade']} you like")
     if prefs.get("language") and song.get("language") == prefs["language"]:
@@ -299,7 +348,17 @@ def recommend_detailed(user_prefs: Dict, songs: List[Dict], k: int = 5) -> Dict:
         logger.warning("energy %.2f outside [0, 1]; clamping", prefs["energy"])
         prefs["energy"] = min(1.0, max(0.0, prefs["energy"]))
 
-    candidates, tier = retrieve_candidates_with_tier(prefs, songs, k)
+    # Songs the user already likes shape the taste vector but are never recommended back.
+    liked_ids = set(prefs.pop("liked_ids", None) or [])
+    pool_songs = songs
+    if liked_ids:
+        liked = [s for s in songs if s["id"] in liked_ids]
+        if liked:
+            prefs["taste_vector"] = taste_vector(liked)
+            prefs["liked_songs"] = liked
+            pool_songs = [s for s in songs if s["id"] not in liked_ids]
+
+    candidates, tier = retrieve_candidates_with_tier(prefs, pool_songs, k)
     scored = [(s, score_song(s, prefs)) for s in candidates]
     raw = {s["id"]: score for s, score in scored}
     top = rank_with_diversity(scored, k)

@@ -130,3 +130,68 @@ def test_retrieval_tier_reports_how_far_the_filter_relaxed():
     from src.recommender import retrieve_candidates_with_tier
     assert retrieve_candidates_with_tier({}, SONGS, 5)[1] == "all"
     assert retrieve_candidates_with_tier({"genre": "nonexistent", "mood": "none"}, SONGS, 5)[1] == "fallback"
+
+
+# ---- v3: similarity to liked songs ---------------------------------------------
+def _mode(mode):
+    """Context manager to switch the similarity mode and restore it."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def cm():
+        saved = recommender.SIMILARITY_MODE
+        recommender.SIMILARITY_MODE = mode
+        try:
+            yield
+        finally:
+            recommender.SIMILARITY_MODE = saved
+    return cm()
+
+
+def _sound_song(id, artist, energy, valence=0.5, dance=0.5, acoustic=0.5, tempo=100):
+    s = song(id, artist, energy=energy)
+    s.update(valence=valence, danceability=dance, acousticness=acoustic, tempo_bpm=tempo)
+    return s
+
+
+def test_similarity_is_one_for_identical_and_zero_beyond_radius():
+    a = _sound_song(1, "A", 0.2)
+    far = _sound_song(2, "B", 0.2, valence=0.0, dance=0.0, acoustic=1.0, tempo=400)
+    taste = recommender.taste_vector([a])
+    assert abs(recommender.similarity_to_taste(a, taste) - 1.0) < 1e-12
+    assert recommender.similarity_to_taste(far, taste) == 0.0
+
+
+def test_taste_vector_is_the_average_sound():
+    a, b = _sound_song(1, "A", 0.2), _sound_song(2, "B", 0.8)
+    assert abs(recommender.taste_vector([a, b])[0] - 0.5) < 1e-12
+
+
+def test_liked_songs_are_never_recommended_back_and_boost_similar_songs():
+    liked = [s for s in SONGS if s["id"] in (2, 4)]  # two lofi songs
+    detail = recommender.recommend_detailed({"liked_ids": [2, 4], "energy": 0.4}, SONGS, k=5)
+    ids = [r["song"]["id"] for r in detail["results"]]
+    assert not ({2, 4} & set(ids)) and len(ids) == 5
+    assert all(r["breakdown"]["similarity"] >= 0 for r in detail["results"])
+    assert detail["results"][0]["breakdown"]["similarity"] > 0
+    assert any("sounds like" in r["explanation"] for r in detail["results"])
+
+
+def test_no_liked_songs_means_no_similarity_and_unchanged_results():
+    prefs = {"genre": "pop", "mood": "happy", "energy": 0.8}
+    base = [s["id"] for s, _, _ in recommend_songs(prefs, SONGS, k=5)]
+    empty = [s["id"] for s, _, _ in recommend_songs({**prefs, "liked_ids": []}, SONGS, k=5)]
+    unknown = [s["id"] for s, _, _ in recommend_songs({**prefs, "liked_ids": [99999]}, SONGS, k=5)]
+    assert base == empty == unknown
+    assert recommender.recommend_detailed(prefs, SONGS, 3)["results"][0]["breakdown"]["similarity"] == 0.0
+
+
+def test_nearest_mode_handles_split_taste_better_than_centroid():
+    quiet, loud = _sound_song(1, "A", 0.1, acoustic=0.9), _sound_song(2, "B", 0.9, acoustic=0.1)
+    near_quiet = _sound_song(3, "C", 0.12, acoustic=0.88)
+    prefs = {"taste_vector": recommender.taste_vector([quiet, loud]), "liked_songs": [quiet, loud]}
+    with _mode("centroid"):
+        centroid = recommender.taste_similarity(near_quiet, prefs)
+    with _mode("nearest"):
+        nearest = recommender.taste_similarity(near_quiet, prefs)
+    assert nearest > centroid

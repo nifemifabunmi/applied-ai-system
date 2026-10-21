@@ -35,6 +35,7 @@ GROUPS = [  # label, colour, scoring components that belong to it
     ("Mood", "#e0a030", ["mood"]),
     ("Energy", "#5b5fef", ["energy"]),
     ("Sound", "#d9567b", ["acoustic", "valence", "danceability", "tempo"]),
+    ("Sounds like your songs", "#8a9a2b", ["similarity"]),
 ]
 TIER_TEXT = {
     "both": "matched your genre and mood",
@@ -67,7 +68,7 @@ moods, mood_counts = options_for("mood")
 # State: defaults and preset buttons
 # --------------------------------------------------------------------------
 ANY = "Any"
-defaults = {"genre": "pop", "mood": "happy", "energy": 0.8, "acoustic": "Avoid it", "k": 5}
+defaults = {"genre": "pop", "mood": "happy", "energy": 0.8, "acoustic": "Avoid it", "k": 5, "liked": []}
 for key, value in defaults.items():
     st.session_state.setdefault(key, value)
 
@@ -77,6 +78,7 @@ def apply_preset(name):
         st.session_state[key] = value
     for key in TUNE:
         st.session_state[f"use_{key}"] = False
+    st.session_state["liked"] = []
 
 
 # --------------------------------------------------------------------------
@@ -99,6 +101,11 @@ with st.sidebar:
                       disabled=not st.session_state.get(f"use_{key}", False),
                       label_visibility="collapsed")
 
+    title_of = {s["id"]: f"{s['title']} ({s['artist']})" for s in songs}
+    st.multiselect("Songs you already like (optional)", list(title_of), key="liked",
+                   format_func=lambda i: title_of[i],
+                   help="Recommendations will sound like these and never repeat them.")
+
     st.select_slider("Songs to show", options=[3, 5, 10], key="k")
 
 prefs = {
@@ -110,6 +117,8 @@ prefs = {
 for key in TUNE:
     if st.session_state.get(f"use_{key}", False):
         prefs[key] = st.session_state[f"val_{key}"]
+if st.session_state["liked"]:
+    prefs["liked_ids"] = list(st.session_state["liked"])
 
 # --------------------------------------------------------------------------
 # Main: run the real pipeline and show every step
@@ -129,6 +138,9 @@ c1.metric("Songs in the catalog", len(songs))
 c2.metric("Candidates", detail["pool_size"])
 c3.metric("Picks", len(results))
 st.caption(f"Candidates {TIER_TEXT[detail['tier']]}. Picks are spread across artists.")
+if st.session_state["liked"]:
+    st.caption("Liked songs add a small bonus for similar-sounding music. In testing this did not measurably "
+               "improve accuracy over genre, mood and energy alone; see reports/v3_results.md.")
 
 
 def group_points(breakdown, parts):

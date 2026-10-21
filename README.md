@@ -16,6 +16,8 @@ This version turns that starter into a small, testable recommender with retrieva
 
 `Recommender` (the OO class) is a thin wrapper over the same functions, so class tests and the CLI exercise identical logic.
 
+**Optional (v3):** provide songs you already like and recommendations get a small bonus for similar sound (energy, valence, danceability, acousticness, and tempo). Liked songs are excluded from recommendations, and explanations can identify a similar liked track.
+
 ## Getting Started
 Requires Python and pip. On Windows PowerShell:
 ```bash
@@ -48,6 +50,7 @@ python -m http.server -d docs 8000     # then open http://localhost:8000
 The parity check requires Node.js in addition to the Python dependencies.
 To host it free, go to GitHub, then Settings, then Pages, choose branch `main` and folder `/docs`.
 Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `src/recommender.py`, so the page runs entirely in the browser with no server. If you change weights or ranking in Python, mirror the change in `web/engine.js` and re-run the parity check.
+The liked-song similarity feature is available in the Python recommender and Streamlit app; the static web demo does not include it.
 
 ## Data
 - `data/songs.csv`: 50 songs, 48 artists, 27 genres, with 10 columns (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). This is the catalog the app and evaluation use.
@@ -100,6 +103,11 @@ The best configuration scored 0.62 NDCG@5 on all seven listeners, compared with 
 
 ![Weight sensitivity and perturbation results](reports/v2_sensitivity.png)
 
+## Similarity to Liked Songs (v3)
+In the Streamlit app, optionally select songs you already like. The recommender excludes those songs from its results and adds a small score bonus for candidates that sound like them across energy, valence, danceability, acousticness, and tempo. Similarity can compare against the average sound of the liked songs or the closest individual liked song; the default is nearest. Run `python -m experiments.run_v3` to reproduce the comparison of both modes and several weights, including leave-one-listener-out evaluation. Full results are in [reports/v3_results.md](reports/v3_results.md).
+
+On all seven labelled listeners, nearest-song similarity at weight 0.5 scored 0.593 NDCG@5 versus 0.586 for rules alone. In leave-one-listener-out testing, selecting among the candidate variants scored 0.549 versus 0.586 for rules alone. The small in-sample gain did not generalize, so the similarity weight is intentionally kept small. This is an exploratory result, not evidence of improved accuracy.
+
 ## Reliability & Testing
 `tests/` includes parametrized reliability checks across six profiles and four values of `k`, as well as checks for:
 - exactly `k` unique, score-sorted, explained results, including rare combinations and total mismatches;
@@ -112,7 +120,8 @@ The best configuration scored 0.62 NDCG@5 on all seven listeners, compared with 
 - detailed score breakdowns agree with the final scores;
 - baseline implementations and evaluation metrics behave correctly;
 - the v1 experiment and report cover baseline comparisons and ablations;
-- weight sampling is reproducible, ties prefer configurations near the defaults, and leave-one-listener-out validation excludes the held-out listener.
+- weight sampling is reproducible, ties prefer configurations near the defaults, and leave-one-listener-out validation excludes the held-out listener;
+- liked songs are excluded from results, similarity scoring and explanations work, and empty or unknown liked-song IDs preserve existing recommendations.
 
 ## Design Decisions and Trade-offs
 - **Interpretability over accuracy:** simple weights and rule-based explanations, at the cost of no collaborative filtering or learned taste.

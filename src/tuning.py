@@ -63,3 +63,28 @@ def leave_one_listener_out(matrix: List[List[float]], configs: List[Dict[str, fl
             "default": matrix[0][held],
         })
     return rows
+
+
+def best_index_simplest(matrix: List[List[float]], complexity: Sequence[float],
+                        train: Sequence[int]) -> int:
+    """
+    Index of the config with the best mean score over `train` listeners; ties go
+    to the least complex config, so a new component is only adopted when it clearly helps.
+    """
+    def key(c):
+        return (round(sum(matrix[c][l] for l in train) / len(train), 9), -complexity[c])
+
+    return max(range(len(matrix)), key=key)
+
+
+def leave_one_out_simplest(matrix: List[List[float]], complexity: Sequence[float],
+                           baseline_index: int = 0) -> List[Dict]:
+    """Leave-one-listener-out selection among configs; compares with `baseline_index`."""
+    n_listeners = len(matrix[0])
+    rows = []
+    for held in range(n_listeners):
+        train = [l for l in range(n_listeners) if l != held]
+        c = best_index_simplest(matrix, complexity, train)
+        rows.append({"held_out": held, "config_index": c,
+                     "chosen": matrix[c][held], "baseline": matrix[baseline_index][held]})
+    return rows
