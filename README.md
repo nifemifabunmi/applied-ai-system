@@ -4,27 +4,33 @@
 **Music Recommender Simulation** was a simple content-based recommender that suggests songs from user preferences for genre, mood and song features. The goal was to see how recommenders turn data into predictions, where bias creeps in, and how scoring choices change results.
 
 ## Summary
-This version turns that starter into a small, testable, **two-stage recommender** (retrieval, then ranking). It filters a song catalog, scores candidates, picks a diverse top-k, and writes a plain-language explanation for every recommendation. It is rule-based on purpose, so every score can be traced and explained. It does not use machine learning or an LLM.
+This version turns that starter into a small, testable recommender with retrieval, scoring, diversity-aware ranking, and explanations. It filters a song catalog, scores candidates, selects a diverse list, and writes a plain-language explanation for every recommendation. It is rule-based on purpose, so every score can be traced and explained. It does not use machine learning or an LLM.
 
 ## Architecture
 ![System Architecture](diagrams/architecture.png)
 
-1. **Retrieval** (`retrieve_candidates`): narrows the catalog by genre/mood. The filter relaxes step by step (genre AND mood, then genre OR mood, then whole catalog) until at least `k` candidates exist, so the system always has enough songs to return.
-2. **Scoring** (`score_song`): one function used everywhere. Genre and mood matches, a smooth energy-closeness curve, and acousticness all count. Optional targets (valence, danceability, tempo, decade, language, ...) count only when the user supplies them. All weights live in `WEIGHTS`.
+1. **Retrieval** (`retrieve_candidates`): narrows the catalog by genre/mood. The filter relaxes step by step (genre AND mood, then genre OR mood, then the whole catalog) until at least `k` candidates are available or the catalog is exhausted.
+2. **Scoring** (`score_song`): one function used everywhere. Genre and mood matches, a smooth energy-closeness curve, and acousticness all count. Optional user targets such as valence, danceability, tempo, decade, detailed mood, instrumental preference, and language are used when supplied and supported by the data. Popularity is scored automatically when a song has that field. All weights live in `WEIGHTS`.
 3. **Diversity-aware ranking** (`rank_with_diversity`): greedy selection that subtracts a penalty each time an artist repeats, so a slightly lower-scoring song by a new artist can win a slot.
 4. **Explanation** (`explain_song`): lists why each song matched and suggests two similar songs (shared genre/mood/artist).
 
 `Recommender` (the OO class) is a thin wrapper over the same functions, so class tests and the CLI exercise identical logic.
 
 ## Getting Started
+Requires Python and pip. On Windows PowerShell:
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Mac/Linux  (Windows: .venv\Scripts\activate)
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-streamlit run app.py             # web app (runs the real Python recommender)
-python -m src.main               # command-line demo with four user profiles
-python evaluation.py             # metrics + guardrail checks (exit code 1 on failure)
-pytest                           # test suite
+```
+
+On macOS/Linux, activate the environment with `source .venv/bin/activate` instead. Then run any of the following from the project root:
+
+```bash
+streamlit run app.py      # interactive app using the Python recommender
+python -m src.main        # command-line demo with four user profiles
+python evaluation.py      # metrics and guardrail checks (exit code 1 on failure)
+python -m pytest          # automated test suite
 ```
 
 ## Streamlit App (`app.py`)
@@ -37,6 +43,7 @@ python scripts/build_web.py            # rebuild docs/index.html from web/ + dat
 python scripts/check_web_parity.py     # confirm the JS engine ranks exactly like the Python one
 python -m http.server -d docs 8000     # then open http://localhost:8000
 ```
+The parity check requires Node.js in addition to the Python dependencies.
 To host it free, go to GitHub, then Settings, then Pages, choose branch `main` and folder `/docs`.
 Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `src/recommender.py`, so the page runs entirely in the browser with no server. If you change weights or ranking in Python, mirror the change in `web/engine.js` and re-run the parity check.
 
@@ -63,21 +70,22 @@ Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `
 | Catalog coverage | 0.52 (26 of 50 songs recommended) |
 | Guardrails (k results, no duplicates, explanations present) | all passed |
 
-Genre match is low for rock, electronic and blues because the catalog has only one to two songs per genre. The system pads with the closest energy and mood matches rather than failing. See `model_card.md`.
+Genre match is low for rock, electronic and blues because the catalog has only one to two songs per genre. The system broadens retrieval and ranks the available candidates rather than failing. See `model_card.md`.
 
 ## Reliability & Testing
-`tests/` holds ~38 checks (parametrized across 6 profiles and 4 values of `k`):
+`tests/` includes parametrized reliability checks across six profiles and four values of `k`, as well as checks for:
 - exactly `k` unique, score-sorted, explained results, including rare combinations and total mismatches;
 - edge cases: `k=0`, empty catalog, `k` larger than the catalog, out-of-range energy;
 - ranking quality: exact matches rank first, genre matches dominate when available;
 - the energy score has no cliffs, and optional targets change ranking;
 - the diversity penalty really swaps in a new artist;
 - the class wrapper and functional pipeline agree;
-- both CSVs load with valid value ranges.
+- both CSVs load with valid value ranges;
+- detailed score breakdowns agree with the final scores.
 
 ## Design Decisions and Trade-offs
 - **Interpretability over accuracy:** simple weights and rule-based explanations, at the cost of no collaborative filtering or learned taste.
-- **Always answer:** progressive retrieval relaxation guarantees `k` results, but for rare tastes those results are weaker matches. This is documented, not hidden.
+- **Progressive retrieval relaxation:** the system returns up to `k` results, broadening the candidate pool for rare tastes. If the catalog contains fewer than `k` songs, it returns all available songs; an empty catalog returns no results.
 - **One scoring path:** removes drift between the tested class and the shipped function.
 - **Logging:** the library uses `logging.getLogger(__name__)` and leaves handler setup to the application.
 
