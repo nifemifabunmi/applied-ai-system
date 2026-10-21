@@ -1,0 +1,19 @@
+{
+  "_note": "Hand-labelled by listening context, NOT by the recommender's own features. seeds = songs the listener already knows (used to derive their taste profile and excluded from recommendations); liked = every song in the catalog this listener would plausibly enjoy. Held-out liked songs (liked minus seeds) are the relevant items. Please review and replace with your own judgement.",
+  "listeners": [
+    {"name": "Study session", "context": "quiet, low-energy background music for focus",
+     "seeds": [2, 4, 6], "liked": [2, 4, 6, 9, 45, 14, 46, 41, 7]},
+    {"name": "Gym workout", "context": "loud, fast, high-intensity",
+     "seeds": [3, 5, 17], "liked": [3, 5, 17, 47, 20, 43, 11]},
+    {"name": "Lagos party", "context": "danceable West African and Latin party music",
+     "seeds": [21, 22, 49], "liked": [21, 22, 49, 37, 29, 23, 25, 31, 33, 28]},
+    {"name": "Late-night jazz and blues", "context": "slow, warm, reflective evening listening",
+     "seeds": [26, 27, 16], "liked": [26, 27, 16, 7, 36, 38, 19]},
+    {"name": "Americana road trip", "context": "storytelling, guitars, nostalgic",
+     "seeds": [12, 44, 18], "liked": [12, 44, 18, 16, 50, 38, 40]},
+    {"name": "Sunny pop", "context": "bright, catchy, feel-good",
+     "seeds": [1, 39, 48], "liked": [1, 39, 48, 10, 40, 42, 50]},
+    {"name": "Night drive", "context": "moody, neon, synth-driven",
+     "seeds": [8, 13, 43], "liked": [8, 13, 43, 50, 40, 41]}
+  ]
+}

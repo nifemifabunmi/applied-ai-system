@@ -23,11 +23,12 @@ PROFILES = [
 
 def show(profile: dict, songs: list, k: int = 5) -> None:
     prefs = {key: v for key, v in profile.items() if key != "name"}
-    print(f"\n=== {profile['name']} ===\n{prefs}\n")
+    print(f"\nUser profile: {prefs}")
+    print("\nTop recommendations:")
     for song, score, explanation in recommend_songs(prefs, songs, k=k):
-        print(f"🎵 {song['title']} by {song['artist']}")
-        print(f"   Score: {score:.2f}")
-        print(f"   Reasons: {explanation}")
+        print(f"- {song['title']} by {song['artist']}")
+        print(f"  Score: {score:.2f}")
+        print(f"  Reasons: {explanation}")
         print("-" * 40)
 
 

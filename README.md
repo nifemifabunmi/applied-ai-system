@@ -31,6 +31,7 @@ streamlit run app.py      # interactive app using the Python recommender
 python -m src.main        # command-line demo with four user profiles
 python evaluation.py      # metrics and guardrail checks (exit code 1 on failure)
 python -m pytest          # automated test suite
+python -m experiments.run_v1  # compare baselines and run the v1 ablation study
 ```
 
 ## Streamlit App (`app.py`)
@@ -50,15 +51,20 @@ Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `
 ## Data
 - `data/songs.csv`: 50 songs, 48 artists, 27 genres, with 10 columns (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). This is the catalog the app and evaluation use.
 - `data/songs_new.csv`: 20-song sample that also has `popularity`, `release_decade`, `detailed_mood`, `instrumentalness` and `language`. These optional columns are supported by the scorer but are not in the main catalog.
+- `data/eval_listeners.json`: hand-labelled listener seed songs and held-out liked songs for offline evaluation.
 
 ## Sample Interaction
 **Input:** `{"genre": "pop", "mood": "happy", "energy": 0.8}`
 ```
-🎵 Sunrise City by Neon Echo
-   Score: 4.56
-   Reasons: This song matches your favorite genre 'pop', matches your favorite mood 'happy',
-   has energy level very close to your target, is not very acoustic, matching your preference.
-   Similar songs you might like: 'Gym Hero' by Max Pulse, 'Night Drive Loop' by Neon Echo.
+User profile: {'genre': 'pop', 'mood': 'happy', 'energy': 0.8}
+
+Top recommendations:
+- Sunrise City by Neon Echo
+  Score: 4.56
+  Reasons: This song matches your favorite genre 'pop', matches your favorite mood 'happy',
+  has energy level very close to your target, is not very acoustic, matching your preference.
+  Similar songs you might like: 'Gym Hero' by Max Pulse, 'Night Drive Loop' by Neon Echo.
+----------------------------------------
 ```
 
 ## Evaluation (`python evaluation.py`, k=5, 7 profiles, 50-song catalog)
@@ -72,6 +78,20 @@ Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `
 
 Genre match is low for rock, electronic and blues because the catalog has only one to two songs per genre. The system broadens retrieval and ranks the available candidates rather than failing. See `model_card.md`.
 
+## Baselines and Ablation (v1)
+Run `python -m experiments.run_v1` to compare the recommender with simple baselines and measure how individual system components affect results. Each listener's taste profile is derived from three seed songs; those seeds are removed from the candidate catalog, and recommendations are evaluated against that listener's held-out liked songs. Results are saved in `reports/v1_results.md`.
+
+| Method | Precision@5 | NDCG@5 | NDCG@5 95% interval |
+|---|---:|---:|---|
+| Random (average of 500 draws) | 0.10 | 0.11 | 0.10 to 0.13 |
+| Energy only | 0.31 | 0.31 | 0.10 to 0.54 |
+| Genre only | 0.40 | 0.45 | 0.20 to 0.67 |
+| Genre + mood rules, no scoring | 0.26 | 0.36 | 0.17 to 0.55 |
+| Audio-feature nearest neighbours | 0.26 | 0.30 | 0.14 to 0.47 |
+| **This system** | **0.46** | **0.59** | **0.41 to 0.77** |
+
+The full system has the best average NDCG and a hit rate of 1.00 in this evaluation, but only seven listeners were labelled and the confidence intervals overlap. Treat this as an encouraging signal, not proof of general performance. The ablation suggests mood, genre, and energy contribute most to relevance; the diversity penalty and retrieval filter primarily improve variety and efficiency here.
+
 ## Reliability & Testing
 `tests/` includes parametrized reliability checks across six profiles and four values of `k`, as well as checks for:
 - exactly `k` unique, score-sorted, explained results, including rare combinations and total mismatches;
@@ -81,7 +101,9 @@ Genre match is low for rock, electronic and blues because the catalog has only o
 - the diversity penalty really swaps in a new artist;
 - the class wrapper and functional pipeline agree;
 - both CSVs load with valid value ranges;
-- detailed score breakdowns agree with the final scores.
+- detailed score breakdowns agree with the final scores;
+- baseline implementations and evaluation metrics behave correctly;
+- the v1 experiment and report cover baseline comparisons and ablations.
 
 ## Design Decisions and Trade-offs
 - **Interpretability over accuracy:** simple weights and rule-based explanations, at the cost of no collaborative filtering or learned taste.
