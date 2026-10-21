@@ -9,10 +9,12 @@ This version turns that starter into a small, testable recommender with retrieva
 ## Architecture
 ![System Architecture](diagrams/architecture.png)
 
-1. **Retrieval** (`retrieve_candidates`): narrows the catalog by genre/mood. The filter relaxes step by step (genre AND mood, then genre OR mood, then the whole catalog) until at least `k` candidates are available or the catalog is exhausted.
-2. **Scoring** (`score_song`): one function used everywhere. Genre and mood matches, a smooth energy-closeness curve, and acousticness all count. Optional user targets such as valence, danceability, tempo, decade, detailed mood, instrumental preference, and language are used when supplied and supported by the data. Popularity is scored automatically when a song has that field. All weights live in `WEIGHTS`.
-3. **Diversity-aware ranking** (`rank_with_diversity`): greedy selection that subtracts a penalty each time an artist repeats, so a slightly lower-scoring song by a new artist can win a slot.
-4. **Explanation** (`explain_song`): lists why each song matched and suggests two similar songs (shared genre/mood/artist).
+1. **Catalog selection and loading**: the Streamlit app selects the small or large CSV catalog; the CLI uses the small catalog. Both call the shared recommender.
+2. **Retrieval** (`retrieve_candidates`): normally narrows candidates by genre/mood and progressively relaxes the filter when needed. With liked songs, the default is to consider the full selected catalog.
+3. **Scoring and ranking** (`score_song`, `rank_with_diversity`): a shared score combines rule-based preferences with optional sound similarity to liked songs, then selects a diverse list with an artist-repeat penalty.
+4. **Explanation** (`explain_song`): provides reasons and similar-song suggestions. The app also displays scores and retrieval details.
+
+Offline v1-v4 experiments use hand-labelled or synthetic evaluation listeners and produce metrics/reports; they are not part of the app's recommendation runtime. The v4 large-catalog protocols are synthetic, not real-user evidence. The optional catalog builder is a separate utility that turns a compatible external CSV into the checked-in large catalog.
 
 `Recommender` (the OO class) is a thin wrapper over the same functions, so class tests and the CLI exercise identical logic.
 
