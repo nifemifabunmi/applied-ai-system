@@ -2,7 +2,7 @@
 
 ## 1. Model Name
 
-**VibeFinder 1.0**
+**VibeFinder 4.0**
 
 ---
 
@@ -20,7 +20,7 @@ The model looks at your favorite genre, mood, and how much energy you want in a 
 
 ## 4. Data
 
-`data/songs.csv` has 50 songs by 48 artists across 27 genres (e.g. afrobeats, fuji, apala, pop, lofi, jazz). Each song has genre, mood, energy, tempo, valence, danceability and acousticness. Most genres have only one to four songs, so many tastes are thinly covered. `data/songs_new.csv` is a separate 20-song sample with extra optional columns (popularity, decade, detailed mood, instrumentalness, language) that the scorer supports but the main catalog lacks.
+`data/songs.csv` has 50 songs by 48 artists across 27 genres (e.g. afrobeats, fuji, apala, pop, lofi, jazz). Each song has genre, mood, energy, tempo, valence, danceability and acousticness. Most genres have only one to four songs, so many tastes are thinly covered. `data/songs_new.csv` is a separate 20-song sample with extra optional columns (popularity, decade, detailed mood, instrumentalness, language) that the scorer supports but the main catalog lacks. `data/catalog_large.csv` (v4) has 1,985 songs across 40 genres, sampled from the Spotify tracks dataset on Kaggle. Its **mood labels are derived from energy and valence**, not assigned by people, so mood and energy are correlated by construction. It also holds hidden columns (`gt_*`) used only for evaluation.
 
 ---
 
@@ -43,29 +43,30 @@ For evaluation, I tested a variety of user profiles, including typical cases (e.
 ---
 
 ### Results (`python evaluation.py`, 7 profiles, k=5)
-Mean genre match 0.40, mean mood match 0.43, mean artist diversity 1.00, catalog coverage 0.52. All guardrails passed (k results, no duplicates, explanations present). Genre match is lowest for rock, electronic and blues, which have one or two songs in the catalog, so the system fills the list with the nearest energy/mood matches. The 56 automated tests cover k-guarantees, edge cases, ranking quality, smooth energy scoring, diversity, baseline metrics, and weight-tuning helpers.
+Mean genre match 0.40, mean mood match 0.43, mean artist diversity 1.00, catalog coverage 0.52. All guardrails passed (k results, no duplicates, explanations present). Genre match is lowest for rock, electronic and blues, which have one or two songs in the catalog, so the system fills the list with the nearest energy/mood matches. The automated test suite has 74 passing tests covering k-guarantees, edge cases, ranking quality, smooth energy scoring, diversity, and the v1-v4 experiments.
 
 ### Optional similarity component (v3)
-Users can optionally provide songs they already like. The recommender adds a small score bonus to songs that are close in energy, valence, danceability, acousticness, and tempo, and excludes the liked songs themselves from the candidate pool. Similarity can use the average feature vector (centroid) or the closest individual liked song (nearest; the default). Explanations may name a liked song with similar sound. The Streamlit app exposes the picker; the static browser demo does not.
-
-On seven hand-labelled listeners, nearest similarity at weight 0.5 reached mean NDCG@5 0.593 versus 0.586 for rules alone, but leave-one-listener-out selection scored 0.549 versus 0.586 for rules alone (`reports/v3_results.md`). This small evaluation provides no evidence of a reliable accuracy gain, so the feature is optional and its default weight is kept small. It is similarity-based and not a trained model.
+If the user lists songs they already like, the model adds a bonus for songs whose sound (energy, valence, danceability, acousticness, tempo) is close to the average sound of those songs, searches the whole catalog instead of only the seed genre/mood, and never recommends the liked songs back. On the 7 hand-labelled listeners it did not improve accuracy (`reports/v3_results.md`). On the large catalog it helps a lot when taste is defined by sound and costs a little when taste is defined by genre (`reports/v4_results.md`), so the weight is a documented trade-off, not a proven optimum. It is similarity-based, not a trained model.
 
 ### Weight choices (v2)
-The scoring weights were initially selected by hand. The v2 analysis (`python -m experiments.run_v2`) evaluated them against seven hand-labelled listeners using random search, leave-one-listener-out validation, and sensitivity tests. The tuned settings improved in-sample NDCG@5 from 0.59 to 0.62, but scored 0.56 versus 0.59 for the current weights on held-out listeners. The weights were therefore left unchanged; the in-sample result appears to overfit this small evaluation set.
+The scoring weights were first set by hand. v2 checked them against the 7 hand-labelled listeners (`reports/v2_results.md`):
 
-| Weight | Current value | Role | Evidence and sensitivity |
-|---|---:|---|---|
-| Genre | 1.25 | Points for an exact genre match | Removing genre reduced v1 NDCG@5 by 0.11. Results stayed within 0.03 of baseline from 0.5x to 4x. |
-| Mood | 1.50 | Points for an exact mood match | Removing mood reduced v1 NDCG@5 by 0.14, the largest ablation change. This was the most sensitive weight; the stable range was 0.75x to 1.5x. |
-| Energy | 2.00 | Maximum points for a close energy match | Removing energy reduced v1 NDCG@5 by 0.07. Excessively high weight hurt; 4x reduced NDCG@5 by 0.14. |
-| Acoustic | 0.60 | Reward or penalty based on acousticness preference | Removing it reduced v1 NDCG@5 by 0.02. The stable range was 0.75x to 2x. |
-| Similarity (optional) | 0.50 | Closeness to the user's liked songs | No reliable held-out improvement in v3; kept small and only active when liked songs are supplied. |
+| Weight | Value | What it does | Evidence | Range that stays within 0.03 NDCG of the current score |
+|---|---|---|---|---|
+| genre | 1.25 | Points for an exact genre match | Removing it costs 0.11 NDCG (v1) | 0.5x to 4x (flat: not sensitive) |
+| mood | 1.50 | Points for an exact mood match | Removing it costs 0.14 NDCG (v1), the largest | 0.75x to 1.5x (the most sensitive) |
+| energy | 2.00 | Up to 2 points for energy closeness | Removing it costs 0.07; too much hurts (4x drops NDCG by 0.14) | 0.5x to 1.5x |
+| acoustic | 0.60 | Reward or penalty from acousticness | Removing it costs only 0.02 | 0.75x to 2x |
+| similarity (optional) | 3.0 | Closeness to the average sound of the user's liked songs, only when liked songs are given | Small catalog: no measurable gain (v3). Large catalog (v4): +0.21 under audio taste for -0.03 under genre taste vs rules only | A dial, not a tuned optimum: weight 8 gives 0.62 / 0.66, weight 1 gives 0.96 / 0.34 (genre / audio taste) |
 
-Perturbing all four weights by up to 30% produced mean NDCG@5 values from 0.52 to 0.61 across 300 trials. See `reports/v2_results.md` and `reports/v2_sensitivity.png` for the full results. These measurements are exploratory only: seven author-labelled listeners are not enough to support general claims.
+Searching 800 alternative weight sets found one that scores 0.62 against 0.59 on all seven listeners. When each listener was left out in turn (tuned on the other six, scored on the one left out), the tuned weights scored 0.56 against 0.59 for the current ones. So the improvement did not carry over to unseen listeners and **the weights were kept unchanged**. Jittering every weight by up to 30% at once gives 0.52 to 0.61, so the system is reasonably stable but not insensitive. These conclusions rest on 7 listeners and labels written by the project author, so they are indicative only.
+
+### Large-catalog evaluation caveats (v4)
+There is no real listening data, so large-catalog results use two synthetic definitions of taste (by genre, and by sound in a richer feature space). They show behaviour under stated assumptions; they do not show how good the recommendations are for real people. Derived moods also make "mood match" partly redundant with energy.
 
 ## 8. Future Work
 
-I would add more features, like danceability and tempo, to make recommendations smarter. I would also try to make the results more diverse, so you see new songs sometimes. Finally, I would improve the explanations so users know why a song was picked.
+The next evaluation step is to collect consented real-listener preferences and compare them with the synthetic protocols before drawing conclusions about recommendation quality. Other work includes reviewing the source dataset's redistribution terms and bringing the liked-song feature to the static web demo.
 
 ---
 

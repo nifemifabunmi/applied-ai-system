@@ -2,7 +2,13 @@
 
 Each version adds at most three features, so every change can be explained and tested on its own.
 
-## v3.0.0: Does similarity to liked songs help? (current)
+## v4.0.0: What changes on a bigger catalog? (current)
+1. **Large catalog** (`scripts/build_catalog.py`, `data/catalog_large.csv`): 1,985 songs, 40 genres, 1,673 artists, with moods derived from energy and valence. The Streamlit app can switch between the small and large catalogs.
+2. **Two synthetic evaluation protocols** (`experiments/datasets.py`, `data/eval_archetypes.json`): genre-defined taste and audio-defined taste across 60 listener draws in 10 archetypes. Confidence intervals resample whole archetypes.
+3. **Blend trade-off analysis** (`experiments/run_v4.py`, `reports/v4_results.md`): skips genre/mood retrieval when liked songs are supplied and documents a similarity weight of 3 as a trade-off, not a proven optimum.
+Also: group-aware cross-validation and large-catalog tests. The raw source dataset is not included; review its terms before rebuilding or publishing derived data.
+
+## v3.0.0: Does similarity to liked songs help?
 1. **Optional similarity component** (`src/recommender.py`): bonus for songs similar to the user's liked songs using centroid or nearest-song feature-space similarity. Liked songs are not recommended back; explanations may name a similar liked track.
 2. **Streamlit support** (`app.py`): a liked-song picker and score-breakdown category. The static web demo is unchanged.
 3. **Evaluation** (`experiments/run_v3.py`, `reports/v3_results.md`): compare two similarity modes and four weights with leave-one-listener-out validation. No held-out improvement was observed, so the feature remains optional and its weight is small.
@@ -21,5 +27,9 @@ Each version adds at most three features, so every change can be explained and t
 Retrieval that always returns k results, a diversity penalty applied during selection, one shared scoring path, a smooth energy curve, a Streamlit app, tests and accurate docs.
 
 ## Planned
-- **v4:** LLM explanation layer with a guardrail check, CI that runs the tests, refreshed architecture diagram, pinned dependencies.
-- **Larger catalog and more listeners:** needs a real dataset or an expanded catalog plus additional labelled listeners; re-run the v1 to v3 experiments on it.
+- **v5:** LLM explanation layer with a guardrail check, CI that runs the tests, refreshed architecture diagram, pinned dependencies.
+
+## TODO
+- Collect real listening preferences. Both large-catalog protocols are synthetic and cannot establish real-world recommendation quality.
+- Review and replace the hand-written listener labels and archetype genre lists with the author's own judgement.
+- Port liked-song similarity and the large catalog to the static page, or retire that page.

@@ -16,7 +16,7 @@ This version turns that starter into a small, testable recommender with retrieva
 
 `Recommender` (the OO class) is a thin wrapper over the same functions, so class tests and the CLI exercise identical logic.
 
-**Optional (v3):** provide songs you already like and recommendations get a small bonus for similar sound (energy, valence, danceability, acousticness, and tempo). Liked songs are excluded from recommendations, and explanations can identify a similar liked track.
+**Optional (v3/v4):** provide songs you already like and recommendations get a similarity bonus based on energy, valence, danceability, acousticness, and tempo. The app searches the full catalog rather than applying the genre/mood retrieval filter, excludes liked songs from results, and can explain which liked track sounds similar. The default similarity weight is a trade-off, not a proven optimum.
 
 ## Getting Started
 Requires Python and pip. On Windows PowerShell:
@@ -24,9 +24,10 @@ Requires Python and pip. On Windows PowerShell:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install -r requirements-dev.txt  # needed for tests, experiments, and rebuilding the large catalog
 ```
 
-On macOS/Linux, activate the environment with `source .venv/bin/activate` instead. Then run any of the following from the project root:
+On macOS/Linux, activate the environment with `source .venv/bin/activate` instead. Then run commands from the project root:
 
 ```bash
 streamlit run app.py      # interactive app using the Python recommender
@@ -35,10 +36,12 @@ python evaluation.py      # metrics and guardrail checks (exit code 1 on failure
 python -m pytest          # automated test suite
 python -m experiments.run_v1  # compare baselines and run the v1 ablation study
 python -m experiments.run_v2  # tune weights and measure sensitivity
+python -m experiments.run_v3  # evaluate similarity on the small hand-labelled catalog
+python -m experiments.run_v4  # compare rules/similarity under two large-catalog protocols
 ```
 
 ## Streamlit App (`app.py`)
-The main frontend. It imports `src.recommender` directly (via `recommend_detailed`), so it shows exactly what the real system does, with no copy of the logic. Pick a genre, mood and energy (or click an example taste) and each recommendation shows the score breakdown by part, the retrieval funnel (catalog, candidates, picks), any repeat-artist penalty, and the written explanation. To deploy for free, push the repo to GitHub and create an app at share.streamlit.io pointing at `app.py`.
+The main frontend. It imports `src.recommender` directly (via `recommend_detailed`), so it shows exactly what the real system does, with no copy of the logic. Pick a catalog, genre, mood, energy, and optionally songs you already like. Recommendations show the score breakdown, retrieval funnel, repeat-artist penalty, and explanation. To deploy for free, push the repo to GitHub and create an app at share.streamlit.io pointing at `app.py`.
 
 ## Static Web Demo (optional)
 A no-install, single-file copy lives in `docs/index.html`: pick a genre, mood and energy (or an example taste), and each recommendation shows a colour-coded score breakdown, the retrieval funnel (catalog, candidates, picks) and the written explanation.
@@ -53,9 +56,13 @@ Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `
 The liked-song similarity feature is available in the Python recommender and Streamlit app; the static web demo does not include it.
 
 ## Data
-- `data/songs.csv`: 50 songs, 48 artists, 27 genres, with 10 columns (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). This is the catalog the app and evaluation use.
+- `data/songs.csv`: 50 songs, 48 artists, 27 genres, with 10 columns (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). This is the small demo catalog.
+- `data/catalog_large.csv`: 1,985 tracks across 40 genres for the large-catalog app and synthetic experiments. Its mood labels are derived from energy and valence; hidden `gt_*` audio features are used only as evaluation ground truth and are not loaded by the recommender.
 - `data/songs_new.csv`: 20-song sample that also has `popularity`, `release_decade`, `detailed_mood`, `instrumentalness` and `language`. These optional columns are supported by the scorer but are not in the main catalog.
 - `data/eval_listeners.json`: hand-labelled listener seed songs and held-out liked songs for offline evaluation.
+- `data/eval_archetypes.json`: synthetic genre-based archetypes used to generate repeatable evaluation listeners.
+
+The large catalog was derived from a Spotify tracks dataset distributed through Kaggle. The original raw dataset is not included. To rebuild the catalog, obtain a compatible source file, review its license and terms, then run `python -m scripts.build_catalog path\to\dataset.csv`. The build tool requires the development dependencies. Check that the source terms permit redistribution before publishing the derived catalog.
 
 ## Sample Interaction
 **Input:** `{"genre": "pop", "mood": "happy", "energy": 0.8}`
@@ -106,7 +113,24 @@ The best configuration scored 0.62 NDCG@5 on all seven listeners, compared with 
 ## Similarity to Liked Songs (v3)
 In the Streamlit app, optionally select songs you already like. The recommender excludes those songs from its results and adds a small score bonus for candidates that sound like them across energy, valence, danceability, acousticness, and tempo. Similarity can compare against the average sound of the liked songs or the closest individual liked song; the default is nearest. Run `python -m experiments.run_v3` to reproduce the comparison of both modes and several weights, including leave-one-listener-out evaluation. Full results are in [reports/v3_results.md](reports/v3_results.md).
 
-On all seven labelled listeners, nearest-song similarity at weight 0.5 scored 0.593 NDCG@5 versus 0.586 for rules alone. In leave-one-listener-out testing, selecting among the candidate variants scored 0.549 versus 0.586 for rules alone. The small in-sample gain did not generalize, so the similarity weight is intentionally kept small. This is an exploratory result, not evidence of improved accuracy.
+On all seven labelled listeners, nearest-song similarity at weight 0.5 scored 0.593 NDCG@5 versus 0.586 for rules alone. In leave-one-listener-out testing, selecting among the candidate variants scored 0.549 versus 0.586 for rules alone. The small in-sample gain did not generalize. V4 therefore evaluates the feature as a trade-off under two synthetic large-catalog protocols rather than claiming improved real-user accuracy.
+
+## Larger Catalog and Synthetic Evaluation (v4)
+The 1,985-song catalog has no listening history, so the v4 evaluation uses 60 synthetic listeners (10 archetypes with six repeatable seed-song draws) under two deliberately different assumptions:
+
+- **Genre taste:** a listener likes tracks in their archetype's listed genres; this favors genre-based rules.
+- **Audio taste:** a listener likes the 100 tracks closest to their seed songs in a richer feature space, including speechiness, instrumentalness, liveness, and loudness. These hidden evaluation-only features are never supplied to the recommender; this favors similarity.
+
+| Method (NDCG@5) | Genre taste | Audio taste |
+|---|---:|---:|
+| Rules only | 0.953 | 0.238 |
+| Rules + centroid similarity (weight 3, no retrieval filter; shipped default) | 0.923 | 0.452 |
+| Rules + centroid similarity (weight 8, no retrieval filter; worst-case selection) | 0.618 | 0.664 |
+| Audio-feature nearest neighbours | 0.159 | 0.772 |
+
+No method wins under both assumptions. The default similarity blend gives up about 0.03 NDCG under genre taste for a 0.21 gain under audio taste, compared with rules alone. A predeclared worst-case rule would choose weight 8 instead, illustrating that the shipped weight is a design trade-off, not an empirically proven optimum. Full comparisons are in [reports/v4_results.md](reports/v4_results.md); v1 and v3 reports also include large-catalog variants.
+
+All large-catalog findings are synthetic and reflect the stated assumptions, not real user preferences. Since mood is derived from energy and valence, it is not independent human-labeled evidence. The static web demo remains on the small catalog and does not support the liked-song feature.
 
 ## Reliability & Testing
 `tests/` includes parametrized reliability checks across six profiles and four values of `k`, as well as checks for:
@@ -122,6 +146,7 @@ On all seven labelled listeners, nearest-song similarity at weight 0.5 scored 0.
 - the v1 experiment and report cover baseline comparisons and ablations;
 - weight sampling is reproducible, ties prefer configurations near the defaults, and leave-one-listener-out validation excludes the held-out listener;
 - liked songs are excluded from results, similarity scoring and explanations work, and empty or unknown liked-song IDs preserve existing recommendations.
+- the large catalog is reproducible and clean, both synthetic listener protocols are valid, hidden ground-truth features do not leak to recommender scoring, and grouped validation resamples/holds out archetypes.
 
 ## Design Decisions and Trade-offs
 - **Interpretability over accuracy:** simple weights and rule-based explanations, at the cost of no collaborative filtering or learned taste.
@@ -130,7 +155,7 @@ On all seven labelled listeners, nearest-song similarity at weight 0.5 scored 0.
 - **Logging:** the library uses `logging.getLogger(__name__)` and leaves handler setup to the application.
 
 ## Limitations and Responsible Use
-- Tiny, uneven catalog: niche or conflicting tastes get weak matches, and common genres (pop, lofi) dominate.
+- The 50-song catalog is tiny and uneven. The large catalog is broader, but its moods are derived from audio features and its evaluation is synthetic, not real listener evidence.
 - Content-based scoring reinforces existing taste and can create filter bubbles. The diversity penalty only spreads artists, not genres.
 - Explanations are rule-based and describe the scoring, not the user's intent.
 - Intended for learning only, not for production streaming or high-stakes decisions.

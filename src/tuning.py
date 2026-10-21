@@ -8,7 +8,7 @@ was left out.
 """
 import math
 import random
-from typing import Dict, List, Sequence
+from typing import Dict, List, Optional, Sequence
 
 TUNED_KEYS = ("genre", "mood", "energy", "acoustic")
 
@@ -44,23 +44,30 @@ def best_config_index(matrix: List[List[float]], configs: List[Dict[str, float]]
     return max(range(len(configs)), key=key)
 
 
+def _folds(n_listeners: int, groups: Optional[Sequence[str]]):
+    """Yield (held_out_indices, train_indices). A group is held out as a whole."""
+    labels = list(groups) if groups is not None else list(range(n_listeners))
+    for label in dict.fromkeys(labels):
+        held = [i for i, g in enumerate(labels) if g == label]
+        yield held, [i for i in range(n_listeners) if labels[i] != label]
+
+
 def leave_one_listener_out(matrix: List[List[float]], configs: List[Dict[str, float]],
-                           default: Dict[str, float]) -> List[Dict]:
+                           default: Dict[str, float], groups: Optional[Sequence[str]] = None) -> List[Dict]:
     """
-    For each listener: tune on the others, then score the chosen config on the
-    held-out listener. Also records the default's score for a paired comparison.
+    For each listener (or each whole group, when `groups` is given): tune on the
+    rest, then score the chosen config on the held-out ones (their mean). Also
+    records the default's score for a paired comparison.
     """
-    n_listeners = len(matrix[0])
     rows = []
-    for held in range(n_listeners):
-        train = [l for l in range(n_listeners) if l != held]
+    for held, train in _folds(len(matrix[0]), groups):
         c = best_config_index(matrix, configs, default, train)
         rows.append({
-            "held_out": held,
+            "held_out": held[0] if len(held) == 1 else held,
             "config_index": c,
             "config": configs[c],
-            "tuned": matrix[c][held],
-            "default": matrix[0][held],
+            "tuned": sum(matrix[c][l] for l in held) / len(held),
+            "default": sum(matrix[0][l] for l in held) / len(held),
         })
     return rows
 
@@ -78,13 +85,12 @@ def best_index_simplest(matrix: List[List[float]], complexity: Sequence[float],
 
 
 def leave_one_out_simplest(matrix: List[List[float]], complexity: Sequence[float],
-                           baseline_index: int = 0) -> List[Dict]:
-    """Leave-one-listener-out selection among configs; compares with `baseline_index`."""
-    n_listeners = len(matrix[0])
+                           baseline_index: int = 0, groups: Optional[Sequence[str]] = None) -> List[Dict]:
+    """Leave-one-listener (or whole-group) out selection among configs; compares with `baseline_index`."""
     rows = []
-    for held in range(n_listeners):
-        train = [l for l in range(n_listeners) if l != held]
+    for held, train in _folds(len(matrix[0]), groups):
         c = best_index_simplest(matrix, complexity, train)
-        rows.append({"held_out": held, "config_index": c,
-                     "chosen": matrix[c][held], "baseline": matrix[baseline_index][held]})
+        rows.append({"held_out": held[0] if len(held) == 1 else held, "config_index": c,
+                     "chosen": sum(matrix[c][l] for l in held) / len(held),
+                     "baseline": sum(matrix[baseline_index][l] for l in held) / len(held)})
     return rows

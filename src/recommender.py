@@ -29,14 +29,15 @@ WEIGHTS = {
     "detailed_mood": 0.7,
     "instrumental": 0.5,
     "language": 0.3,
-    "similarity": 0.5,        # closeness to the user's liked songs (see reports/v3_results.md: small on purpose)
+    "similarity": 3.0,        # closeness to the user's liked songs (trade-off analysed in reports/v4_results.md)
 }
 ENERGY_TOLERANCE = 0.5        # energy gap at which the bonus reaches 0
 TEMPO_TOLERANCE_BPM = 60.0    # tempo gap at which the bonus reaches 0
 ARTIST_REPEAT_PENALTY = 0.7   # subtracted per earlier pick by the same artist
 SIMILARITY_RADIUS = 1.0       # feature-space distance at which similarity reaches 0
 SIMILARITY_FEATURES = ("energy", "valence", "danceability", "acousticness")
-SIMILARITY_MODE = "nearest"   # "centroid": average sound of liked songs; "nearest": closest single liked song
+SIMILARITY_MODE = "centroid"  # "centroid": average sound of liked songs; "nearest": closest single liked song
+FILTER_WHEN_LIKED = False     # with liked songs, search the whole catalog instead of only the seed genre/mood
 
 
 @dataclass
@@ -358,7 +359,12 @@ def recommend_detailed(user_prefs: Dict, songs: List[Dict], k: int = 5) -> Dict:
             prefs["liked_songs"] = liked
             pool_songs = [s for s in songs if s["id"] not in liked_ids]
 
-    candidates, tier = retrieve_candidates_with_tier(prefs, pool_songs, k)
+    if "taste_vector" in prefs and not FILTER_WHEN_LIKED:
+        # Liked songs describe taste better than one genre/mood label, so do not
+        # confine the search to the seed genre/mood (v4 showed that cap hurts at scale).
+        candidates, tier = list(pool_songs), "liked"
+    else:
+        candidates, tier = retrieve_candidates_with_tier(prefs, pool_songs, k)
     scored = [(s, score_song(s, prefs)) for s in candidates]
     raw = {s["id"]: score for s, score in scored}
     top = rank_with_diversity(scored, k)

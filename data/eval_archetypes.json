@@ -1,0 +1,18 @@
+{
+  "_note": "Synthetic listeners for the large catalog. Each archetype likes every song in its genres (hand-chosen by listening context). A listener is built by drawing 3 seed songs the archetype already knows; the rest of its genres are the held-out relevant songs. Edit the genre lists to change the ground truth.",
+  "seeds_per_listener": 3,
+  "draws_per_archetype": 6,
+  "random_seed": 21,
+  "archetypes": [
+    {"name": "Study and focus", "genres": ["ambient", "classical", "piano", "new-age"]},
+    {"name": "Gym workout", "genres": ["heavy-metal", "hard-rock", "edm", "drum-and-bass"]},
+    {"name": "Dance floor", "genres": ["house", "techno", "trance", "disco"]},
+    {"name": "Latin party", "genres": ["reggaeton", "salsa", "latin", "samba"]},
+    {"name": "Americana road trip", "genres": ["country", "bluegrass", "folk", "singer-songwriter"]},
+    {"name": "Late-night jazz and soul", "genres": ["jazz", "blues", "soul", "r-n-b"]},
+    {"name": "Pop radio", "genres": ["pop", "k-pop", "synth-pop", "indie-pop"]},
+    {"name": "Indie and alternative", "genres": ["indie", "alt-rock", "punk-rock", "trip-hop"]},
+    {"name": "Island sunshine", "genres": ["reggae", "afrobeat", "ska", "dancehall"]},
+    {"name": "Beats and groove", "genres": ["hip-hop", "funk", "r-n-b", "gospel"]}
+  ]
+}

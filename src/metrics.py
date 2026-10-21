@@ -42,3 +42,17 @@ def bootstrap_ci(values: Sequence[float], n_boot: int = 2000, seed: int = 0,
     lo = means[int(n_boot * alpha / 2)]
     hi = means[int(n_boot * (1 - alpha / 2)) - 1]
     return lo, hi
+
+
+def cluster_bootstrap_ci(values: Sequence[float], groups: Sequence[str], n_boot: int = 2000,
+                         seed: int = 0, alpha: float = 0.05) -> Tuple[float, float]:
+    """
+    Bootstrap CI of the mean where whole groups (e.g. listeners drawn from the same
+    archetype) are resampled together. Each group counts once, so repeated random
+    draws from one archetype cannot make the interval look tighter than it is.
+    """
+    by_group = {}
+    for v, g in zip(values, groups):
+        by_group.setdefault(g, []).append(v)
+    means = [sum(vs) / len(vs) for vs in by_group.values()]
+    return bootstrap_ci(means, n_boot=n_boot, seed=seed, alpha=alpha)

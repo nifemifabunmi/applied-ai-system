@@ -42,16 +42,25 @@ TIER_TEXT = {
     "either": "matched your genre or mood (too few matched both)",
     "fallback": "too few matches, so the whole catalog was used",
     "all": "no genre or mood chosen, so every song was considered",
+    "liked": "your liked songs were used, so every other song was considered",
 }
 MINUS = "\u2212"
+ANY = "Any"
+
+
+CATALOGS = {
+    "Small demo (50 songs)": "data/songs.csv",
+    "Large (about 2,000 songs)": "data/catalog_large.csv",
+}
 
 
 @st.cache_data
-def get_songs():
-    return load_songs("data/songs.csv")
+def get_songs(path):
+    return load_songs(path)
 
 
-songs = get_songs()
+st.session_state.setdefault("catalog", "Small demo (50 songs)")
+songs = get_songs(CATALOGS[st.session_state["catalog"]])
 
 
 def options_for(key):
@@ -67,10 +76,19 @@ moods, mood_counts = options_for("mood")
 # --------------------------------------------------------------------------
 # State: defaults and preset buttons
 # --------------------------------------------------------------------------
-ANY = "Any"
 defaults = {"genre": "pop", "mood": "happy", "energy": 0.8, "acoustic": "Avoid it", "k": 5, "liked": []}
 for key, value in defaults.items():
     st.session_state.setdefault(key, value)
+
+# Switching catalogs: liked-song ids belong to the old catalog, and a chosen genre or
+# mood may not exist in the new one (a preset can also pick one that does not), so reset those.
+if st.session_state.get("_last_catalog") != st.session_state["catalog"]:
+    st.session_state["liked"] = []
+    st.session_state["_last_catalog"] = st.session_state["catalog"]
+if st.session_state["genre"] not in [ANY] + genres:
+    st.session_state["genre"] = ANY
+if st.session_state["mood"] not in [ANY] + moods:
+    st.session_state["mood"] = ANY
 
 
 def apply_preset(name):
@@ -85,6 +103,7 @@ def apply_preset(name):
 # Sidebar: taste controls
 # --------------------------------------------------------------------------
 with st.sidebar:
+    st.radio("Catalog", list(CATALOGS), key="catalog")
     st.header("Your taste")
     st.selectbox("Genre", [ANY] + genres, key="genre",
                  format_func=lambda g: g if g == ANY else f"{g} ({genre_counts[g]})")
@@ -139,8 +158,8 @@ c2.metric("Candidates", detail["pool_size"])
 c3.metric("Picks", len(results))
 st.caption(f"Candidates {TIER_TEXT[detail['tier']]}. Picks are spread across artists.")
 if st.session_state["liked"]:
-    st.caption("Liked songs add a small bonus for similar-sounding music. In testing this did not measurably "
-               "improve accuracy over genre, mood and energy alone; see reports/v3_results.md.")
+    st.caption("Liked songs pull the results toward music that sounds like them. How strongly is a trade-off "
+               "between trusting genre labels and trusting sound; see reports/v4_results.md.")
 
 
 def group_points(breakdown, parts):
