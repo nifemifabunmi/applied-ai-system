@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Unit and app tests
+        run: python -m pytest -q
+
+      - name: Evaluation guardrails (k results, no duplicates, explanations present)
+        run: python evaluation.py
+
+      - name: JavaScript engine matches the Python recommender
+        run: python -m scripts.check_web_parity
+
+      - name: Static page is up to date with its sources
+        run: |
+          python -m scripts.build_web
+          git diff --exit-code docs/index.html
+
+      - name: Experiments still run (smoke test)
+        run: |
+          python -m experiments.run_v1
+          python -m experiments.run_v5_guardrail
+          python -m experiments.run_v5_real
+
+      - name: Record the exact versions that passed
+        run: pip freeze > frozen-requirements-py${{ matrix.python-version }}.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frozen-requirements-py${{ matrix.python-version }}
+          path: frozen-requirements-py${{ matrix.python-version }}.txt

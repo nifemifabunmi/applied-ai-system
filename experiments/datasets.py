@@ -36,6 +36,7 @@ def profile_from_seeds(seeds):
 def _listener(name, group, seeds, relevant_ids, songs):
     seed_ids = {s["id"] for s in seeds}
     return {
+        "songs": songs,
         "name": name,
         "group": group,
         "seeds": seeds,
@@ -114,3 +115,20 @@ def load_dataset(name):
     if cfg["protocol"] == "genre":
         return songs, archetype_listeners(songs)
     return songs, audio_taste_listeners(songs, path)
+
+
+def real_listener_draws(songs, taste_files, draws=20, seeds_per_listener=3, seed=5):
+    """
+    Turn real taste files into evaluation listeners: several random draws of 3 seed songs
+    per person; the person's other liked songs are the held-out relevant songs.
+    """
+    rng = random.Random(seed)
+    by_id = {s["id"]: s for s in songs}
+    listeners = []
+    for data in taste_files:
+        liked = [by_id[i] for i in data["liked_ids"]]
+        for draw in range(draws):
+            seeds = rng.sample(liked, seeds_per_listener)
+            listeners.append(_listener(f"{data['nickname']} #{draw + 1}", data["nickname"], seeds,
+                                       data["liked_ids"], songs))
+    return listeners

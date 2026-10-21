@@ -1,0 +1,11 @@
+{
+  "schema": "vibefinder-taste-v1",
+  "catalog": "large",
+  "catalog_size": 1985,
+  "nickname": "example",
+  "liked_ids": [1, 2, 3, 4, 5, 6, 7, 8],
+  "liked_keys": [],
+  "exported_at": "2026-01-01T00:00:00Z",
+  "example": true,
+  "_note": "Shows the file format only. Files with example=true are ignored by the evaluation. Real files come from the 'Share your taste' button in the app."
+}

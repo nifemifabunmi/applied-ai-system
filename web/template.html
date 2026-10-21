@@ -11,7 +11,7 @@
 :root {
   --bg: #edf0f5; --surface: #ffffff; --ink: #16213e; --muted: #566077; --line: #d3d9e4;
   --field: #f6f8fb; --focus: #2d4bff;
-  --c-genre: #1f9a8a; --c-mood: #e0a030; --c-energy: #5b5fef; --c-sound: #d9567b; --c-penalty: #8a94a8;
+  --c-genre: #1f9a8a; --c-mood: #e0a030; --c-energy: #5b5fef; --c-sound: #d9567b; --c-sim: #7f8f22; --c-penalty: #8a94a8;
   --sans: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
   box-sizing: border-box;
@@ -23,14 +23,14 @@
   :root:not([data-theme="light"]) {
     --bg: #111828; --surface: #1a2338; --ink: #e8ecf6; --muted: #9aa5bd; --line: #2c3752;
     --field: #141c2f; --focus: #8fa0ff;
-    --c-genre: #3cc1af; --c-mood: #f0b84e; --c-energy: #8d90ff; --c-sound: #ef7c9c; --c-penalty: #7d879d;
+    --c-genre: #3cc1af; --c-mood: #f0b84e; --c-energy: #8d90ff; --c-sound: #ef7c9c; --c-sim: #b2c24a; --c-penalty: #7d879d;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #111828; --surface: #1a2338; --ink: #e8ecf6; --muted: #9aa5bd; --line: #2c3752;
   --field: #141c2f; --focus: #8fa0ff;
-  --c-genre: #3cc1af; --c-mood: #f0b84e; --c-energy: #8d90ff; --c-sound: #ef7c9c; --c-penalty: #7d879d;
+  --c-genre: #3cc1af; --c-mood: #f0b84e; --c-energy: #8d90ff; --c-sound: #ef7c9c; --c-sim: #b2c24a; --c-penalty: #7d879d;
   color-scheme: dark;
 }
 html { scroll-padding-top: env(safe-area-inset-top, 0px); }
@@ -119,6 +119,28 @@ ol.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
 .foot { margin-top: 24px; color: var(--muted); font-size: 0.85rem; max-width: 70ch; }
+
+.picker input[type="search"] { width: 100%; font: 500 1rem var(--sans); color: var(--ink); background: var(--field);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+.matches { list-style: none; margin: 6px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 8px;
+  overflow: hidden; max-height: 250px; overflow-y: auto; }
+.matches:empty { display: none; }
+.matches button { display: block; width: 100%; text-align: left; font: 500 0.9rem var(--sans); color: var(--ink);
+  background: var(--surface); border: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; cursor: pointer; }
+.matches li:last-child button { border-bottom: 0; }
+.matches button:hover { background: var(--field); }
+.matches small { display: block; color: var(--muted); font-weight: 400; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.82rem; background: var(--field);
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 4px 3px 10px; max-width: 100%; }
+.chips .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips .chip button { border: 0; background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 6px; border-radius: 999px; }
+.chips .chip button:hover { color: var(--ink); }
+.btn { font: 600 0.92rem var(--sans); color: var(--surface); background: var(--ink); border: 0; border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.share input[type="text"] { width: 100%; font: 500 1rem var(--sans); color: var(--ink); background: var(--field);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; margin-bottom: 8px; }
+.catalogs { margin-bottom: 14px; }
 </style>
 </head>
 <body>
@@ -130,6 +152,12 @@ ol.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 
   <main class="layout">
     <section class="panel" aria-labelledby="taste-h">
+      <fieldset class="field catalogs"><legend>Catalog</legend>
+        <div class="seg">
+          <label><input type="radio" name="catalog" value="small"><span>Small demo (50)</span></label>
+          <label><input type="radio" name="catalog" value="large" checked><span id="large-label">Large</span></label>
+        </div>
+      </fieldset>
       <h2 id="taste-h">Your taste</h2>
       <div class="presets" id="presets" role="group" aria-label="Example tastes"></div>
 
@@ -145,6 +173,13 @@ ol.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
         </div>
       </fieldset>
 
+      <div class="field picker"><span id="liked-h" style="display:block;font-weight:600;font-size:.92rem;margin-bottom:6px">Songs you already like (optional)</span>
+        <input type="search" id="q" placeholder="Search by title or artist" aria-labelledby="liked-h" autocomplete="off">
+        <ul class="matches" id="matches" aria-label="Matching songs"></ul>
+        <div class="chips" id="chips" aria-label="Songs you like"></div>
+        <p class="hint">Results will sound like these and never repeat them.</p>
+      </div>
+
       <details class="tune">
         <summary>Fine-tune the sound</summary>
         <div id="tune"></div>
@@ -153,6 +188,14 @@ ol.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 
       <label class="field" style="margin-top:16px"><span>Songs to show</span>
         <select id="k"><option>3</option><option selected>5</option><option>10</option></select></label>
+
+      <details class="tune share" id="share">
+        <summary>Share your taste (for the evaluation)</summary>
+        <p class="hint" id="share-hint"></p>
+        <input type="text" id="nick" maxlength="30" placeholder="Pseudonym (not your real name or email)" aria-label="Pseudonym">
+        <button type="button" class="btn" id="download" disabled>Download my taste file</button>
+        <p class="hint">The file holds only song ids, titles, artists and your pseudonym. Nothing is uploaded: you download it and send it to the project owner.</p>
+      </details>
     </section>
 
     <section aria-labelledby="res-h">
@@ -160,26 +203,42 @@ ol.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
       <div class="pipeline" id="pipeline" aria-live="polite"></div>
       <div class="legend" id="legend"></div>
       <ol class="list" id="list"></ol>
-      <p class="foot">Scores come from a transparent rule-based model, not machine learning. Each bar is split by what earned the points. Picks by an artist already in the list lose 0.70 points, so one artist can’t fill the page.</p>
+      <p class="foot">Scores come from a transparent rule-based model, not machine learning. Each bar is split by what earned the points. Picks by an artist already in the list lose 0.70 points, so one artist can’t fill the page. AI-written explanations are only in the Streamlit app.</p>
     </section>
   </main>
 </div>
 
 <script>/*ENGINE*/</script>
 <script>
-const SONGS = /*SONGS*/;
+const CATALOGS = { small: /*SONGS_SMALL*/, large: /*SONGS_LARGE*/ };
 (function () {
   const $ = (id) => document.getElementById(id);
   const MINUS = '\u2212';
+  const MIN_LIKED = 8;
+  const MAX_LIKED = 200;
   const fmt = (n) => (n < 0 ? MINUS : '') + Math.abs(n).toFixed(2);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  const PRESETS = [
-    { name: 'Upbeat pop', genre: 'pop', mood: 'happy', energy: 0.8, acoustic: 'avoid' },
-    { name: 'Study lofi', genre: 'lofi', mood: 'chill', energy: 0.4, acoustic: 'like' },
-    { name: 'Gym rock', genre: 'rock', mood: 'intense', energy: 0.95, acoustic: 'avoid' },
-    { name: 'Late-night jazz', genre: 'jazz', mood: 'relaxed', energy: 0.5, acoustic: 'like' },
-    { name: 'Sad but loud blues', genre: 'blues', mood: 'sad', energy: 0.9, acoustic: 'avoid' },
-  ];
+  let catalog = 'large';
+  let SONGS = CATALOGS[catalog];
+  let liked = [];                       // ids of liked songs in the current catalog
+
+  const PRESETS = {
+    small: [
+      { name: 'Upbeat pop', genre: 'pop', mood: 'happy', energy: 0.8, acoustic: 'avoid' },
+      { name: 'Study lofi', genre: 'lofi', mood: 'chill', energy: 0.4, acoustic: 'like' },
+      { name: 'Gym rock', genre: 'rock', mood: 'intense', energy: 0.95, acoustic: 'avoid' },
+      { name: 'Late-night jazz', genre: 'jazz', mood: 'relaxed', energy: 0.5, acoustic: 'like' },
+      { name: 'Sad but loud blues', genre: 'blues', mood: 'sad', energy: 0.9, acoustic: 'avoid' },
+    ],
+    large: [
+      { name: 'Upbeat pop', genre: 'pop', mood: 'happy', energy: 0.85, acoustic: 'avoid' },
+      { name: 'Study session', genre: 'classical', mood: 'peaceful', energy: 0.25, acoustic: 'like' },
+      { name: 'Gym metal', genre: 'heavy-metal', mood: 'intense', energy: 0.9, acoustic: 'avoid' },
+      { name: 'Late-night jazz', genre: 'jazz', mood: 'chill', energy: 0.3, acoustic: 'like' },
+      { name: 'Party hip-hop', genre: 'hip-hop', mood: 'energetic', energy: 0.8, acoustic: 'avoid' },
+    ],
+  };
   const TUNE = [
     { key: 'acousticness', label: 'Acousticness', min: 0, max: 1, step: 0.05, val: 0.5, f: (v) => v.toFixed(2) },
     { key: 'valence', label: 'Positivity', min: 0, max: 1, step: 0.05, val: 0.6, f: (v) => v.toFixed(2) },
@@ -191,20 +250,25 @@ const SONGS = /*SONGS*/;
     { id: 'mood', label: 'Mood', color: 'var(--c-mood)', keys: ['mood'] },
     { id: 'energy', label: 'Energy', color: 'var(--c-energy)', keys: ['energy'] },
     { id: 'sound', label: 'Sound', color: 'var(--c-sound)', keys: ['acoustic', 'valence', 'danceability', 'tempo'] },
+    { id: 'similarity', label: 'Sounds like your songs', color: 'var(--c-sim)', keys: ['similarity'] },
   ];
+  const TIER_TEXT = {
+    both: 'matched your genre and mood', either: 'matched your genre or mood (too few matched both)',
+    fallback: 'too few matches, so the whole catalog was used', all: 'no genre or mood chosen, so every song was considered',
+    liked: 'your liked songs were used, so every other song was considered',
+  };
 
-  const count = (key) => {
+  // ---------------------------------------------------------------- setup ---
+  function counts(key) {
     const m = {};
     SONGS.forEach((s) => { m[s[key]] = (m[s[key]] || 0) + 1; });
     return Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  };
-  const fillSelect = (el, key, anyLabel) => {
+  }
+  function fillSelect(el, key, anyLabel) {
     el.innerHTML = `<option value="">${anyLabel}</option>` +
-      count(key).map(([v, n]) => `<option value="${v}">${v} (${n})</option>`).join('');
-  };
-  fillSelect($('genre'), 'genre', 'Any genre');
-  fillSelect($('mood'), 'mood', 'Any mood');
-
+      counts(key).map(([v, n]) => `<option value="${esc(v)}">${esc(v)} (${n})</option>`).join('');
+  }
+  $('large-label').textContent = `Large (${CATALOGS.large.length.toLocaleString('en-US')})`;
   $('tune').innerHTML = TUNE.map((t) => `
     <div class="tuneRow">
       <div class="head"><input type="checkbox" id="on-${t.key}" aria-label="Use ${t.label}">
@@ -212,40 +276,104 @@ const SONGS = /*SONGS*/;
       <input type="range" id="r-${t.key}" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.val}" disabled aria-label="${t.label} target">
     </div>`).join('');
 
-  $('legend').innerHTML = GROUPS.map((g) => `<span><i class="sw" style="background:${g.color}"></i>${g.label}</span>`).join('');
-  $('presets').innerHTML = PRESETS.map((p, i) => `<button type="button" class="chipbtn" data-i="${i}" aria-pressed="false">${p.name}</button>`).join('');
+  function renderPresets() {
+    $('presets').innerHTML = PRESETS[catalog].map((p, i) =>
+      `<button type="button" class="chipbtn" data-i="${i}" aria-pressed="false">${esc(p.name)}</button>`).join('');
+  }
 
+  function setCatalog(name) {
+    catalog = name;
+    SONGS = CATALOGS[name];
+    liked = [];
+    fillSelect($('genre'), 'genre', 'Any genre');
+    fillSelect($('mood'), 'mood', 'Any mood');
+    $('q').value = '';
+    renderPresets(); renderLiked(); renderMatches('');
+    applyPreset(0);
+  }
+
+  // ----------------------------------------------------------- liked songs ---
+  const byId = () => new Map(SONGS.map((s) => [s.id, s]));
+  function renderMatches(query) {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) { $('matches').innerHTML = ''; return; }
+    if (liked.length >= MAX_LIKED) {
+      $('matches').innerHTML = `<li style="padding:8px 10px;color:var(--muted);font-size:.9rem">Taste files can include at most ${MAX_LIKED} songs.</li>`;
+      return;
+    }
+    const out = SONGS.filter((s) => !liked.includes(s.id) &&
+      (s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q))).slice(0, 8);
+    $('matches').innerHTML = out.length
+      ? out.map((s) => `<li><button type="button" data-add="${s.id}">${esc(s.title)}<small>${esc(s.artist)} (${esc(s.genre)})</small></button></li>`).join('')
+      : '<li style="padding:8px 10px;color:var(--muted);font-size:.9rem">No songs match.</li>';
+  }
+  function renderLiked() {
+    const m = byId();
+    $('chips').innerHTML = liked.map((id) => {
+      const s = m.get(id);
+      return `<span class="chip"><span title="${esc(s.title)}">${esc(s.title)}</span><button type="button" data-remove="${id}" aria-label="Remove ${esc(s.title)}">\u00d7</button></span>`;
+    }).join('');
+    updateShare();
+  }
+
+  // ------------------------------------------------------------ share taste ---
+  const cleanNick = (n) => {
+    const raw = String(n || '').trim();
+    if (raw.includes('@')) return 'anonymous';
+    return raw.replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 30) || 'anonymous';
+  };
+  function updateShare() {
+    const large = catalog === 'large';
+    $('download').disabled = !(large && MIN_LIKED <= liked.length && liked.length <= MAX_LIKED);
+    $('share-hint').textContent = large
+      ? `Add ${MIN_LIKED} to ${MAX_LIKED} songs you like (${liked.length} so far), then download your file.`
+      : 'Switch to the Large catalog to share your taste.';
+  }
+  function downloadTaste() {
+    const m = byId();
+    const data = {
+      schema: 'vibefinder-taste-v1', catalog: 'large', catalog_size: SONGS.length,
+      nickname: cleanNick($('nick').value), liked_ids: liked,
+      liked_keys: liked.map((id) => `${m.get(id).title} | ${m.get(id).artist}`),
+      exported_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), example: false,
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'my_taste.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // --------------------------------------------------------------- rendering ---
   function readPrefs() {
     const prefs = {
       genre: $('genre').value, mood: $('mood').value, energy: parseFloat($('energy').value),
       likes_acoustic: document.querySelector('input[name=acoustic]:checked').value === 'like',
     };
     TUNE.forEach((t) => { if ($('on-' + t.key).checked) prefs[t.key] = parseFloat($('r-' + t.key).value); });
+    if (liked.length) prefs.liked_ids = liked.slice();
     return prefs;
   }
-
-  const TIER_TEXT = {
-    both: 'matched your genre and mood', either: 'matched your genre or mood (too few matched both)',
-    fallback: 'too few matches, so the whole catalog was used', all: 'no genre or mood chosen, so every song was considered',
-  };
 
   function render() {
     const prefs = readPrefs();
     const k = parseInt($('k').value, 10);
     $('energy-o').textContent = prefs.energy.toFixed(2);
     const out = VibeEngine.recommend(prefs, SONGS, k);
+    const groups = GROUPS.filter((g) => g.id !== 'similarity' || liked.length);
 
+    $('legend').innerHTML = groups.map((g) => `<span><i class="sw" style="background:${g.color}"></i>${g.label}</span>`).join('');
     $('pipeline').innerHTML = `
-      <div class="stage"><b>${SONGS.length}</b><small>songs in the catalog</small></div>
-      <div class="stage"><b>${out.poolSize}</b><small>candidates, ${TIER_TEXT[out.tier]}</small></div>
+      <div class="stage"><b>${SONGS.length.toLocaleString('en-US')}</b><small>songs in the catalog</small></div>
+      <div class="stage"><b>${out.poolSize.toLocaleString('en-US')}</b><small>candidates, ${TIER_TEXT[out.tier]}</small></div>
       <div class="stage"><b>${out.results.length}</b><small>picks, with artists spread out</small></div>`;
 
     const group = (r, g) => g.keys.reduce((s, key) => s + r.breakdown[key], 0);
-    const maxPos = Math.max(0.001, ...out.results.map((r) => GROUPS.reduce((s, g) => s + Math.max(0, group(r, g)), 0)));
+    const maxPos = Math.max(0.001, ...out.results.map((r) => groups.reduce((s, g) => s + Math.max(0, group(r, g)), 0)));
 
     $('list').innerHTML = out.results.map((r, i) => {
       const s = r.song;
-      const segs = GROUPS.map((g) => ({ g, v: group(r, g) }));
+      const segs = groups.map((g) => ({ g, v: group(r, g) }));
       const bar = segs.filter((x) => x.v > 0)
         .map((x) => `<i style="width:${(x.v / maxPos) * 100}%;background:${x.g.color}" title="${x.g.label} ${fmt(x.v)}"></i>`).join('');
       const parts = segs.filter((x) => Math.abs(x.v) > 0.004)
@@ -254,35 +382,49 @@ const SONGS = /*SONGS*/;
       return `<li class="rec">
         <div class="rank" aria-hidden="true">${i + 1}</div>
         <div>
-          <h3 class="title">${s.title}</h3>
-          <div class="artist">${s.artist}</div>
+          <h3 class="title">${esc(s.title)}</h3>
+          <div class="artist">${esc(s.artist)}</div>
           <div class="tags">
-            <span class="tag ${prefs.genre && s.genre === prefs.genre ? 'hit' : ''}">${s.genre}</span>
-            <span class="tag ${prefs.mood && s.mood === prefs.mood ? 'hit' : ''}">${s.mood}</span>
+            <span class="tag ${prefs.genre && s.genre === prefs.genre ? 'hit' : ''}">${esc(s.genre)}</span>
+            <span class="tag ${prefs.mood && s.mood === prefs.mood ? 'hit' : ''}">${esc(s.mood)}</span>
             <span class="tag">energy ${s.energy.toFixed(2)}</span>
           </div>
         </div>
         <div class="score">${fmt(r.adjusted)}<small>score</small></div>
         <div class="bar" role="img" aria-label="Score breakdown">${bar}</div>
         <div class="parts">${parts.join('')}</div>
-        <p class="why">${r.explanation}</p>
+        <p class="why">${esc(r.explanation)}</p>
       </li>`;
     }).join('');
   }
 
   function applyPreset(i) {
-    const p = PRESETS[i];
+    const p = PRESETS[catalog][i];
     $('genre').value = p.genre; $('mood').value = p.mood; $('energy').value = p.energy;
     document.querySelector(`input[name=acoustic][value=${p.acoustic}]`).checked = true;
     TUNE.forEach((t) => { $('on-' + t.key).checked = false; $('r-' + t.key).disabled = true; });
+    liked = []; renderLiked();
     render(); markPreset(i);
   }
   const markPreset = (active) => document.querySelectorAll('.chipbtn').forEach((b) =>
     b.setAttribute('aria-pressed', String(Number(b.dataset.i) === active)));
 
+  // ------------------------------------------------------------------ events ---
   $('presets').addEventListener('click', (e) => { const b = e.target.closest('.chipbtn'); if (b) applyPreset(+b.dataset.i); });
+  $('q').addEventListener('input', (e) => renderMatches(e.target.value));
+  $('matches').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-add]'); if (!b) return;
+    liked.push(+b.dataset.add); $('q').value = ''; renderMatches(''); renderLiked(); markPreset(-1); render();
+  });
+  $('chips').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-remove]'); if (!b) return;
+    liked = liked.filter((id) => id !== +b.dataset.remove); renderLiked(); markPreset(-1); render();
+  });
+  $('download').addEventListener('click', downloadTaste);
+  document.querySelectorAll('input[name=catalog]').forEach((r) => r.addEventListener('change', (e) => { if (e.target.checked) setCatalog(e.target.value); }));
   document.querySelector('.panel').addEventListener('input', (e) => {
     const t = e.target;
+    if (t.id === 'q' || t.id === 'nick' || t.name === 'catalog') return;
     TUNE.forEach((x) => {
       if (t.id === 'on-' + x.key) $('r-' + x.key).disabled = !t.checked;
       if (t.id === 'r-' + x.key) $('o-' + x.key).textContent = x.f(parseFloat(t.value));
@@ -290,7 +432,7 @@ const SONGS = /*SONGS*/;
     if (!t.closest('.presets')) markPreset(-1);
     render();
   });
-  applyPreset(0);
+  setCatalog('large');
 })();
 </script>
 </body>

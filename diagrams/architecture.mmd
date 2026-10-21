@@ -1,52 +1,28 @@
-flowchart LR
-    subgraph User["User-facing applications"]
-        U["User preferences<br/>genre, mood, energy<br/>optional liked songs"]
-        APP["Streamlit app<br/>catalog picker"]
-        CLI["Command-line demo"]
-        U --> APP
-        U --> CLI
+flowchart TD
+    taste["Your taste<br/>genre, mood, energy, acoustic, sound targets"]
+    liked["Songs you already like (optional)"]
+    catalog["Catalog<br/>50-song demo or 1,985 songs"]
+    retr["1. Retrieval<br/>genre AND mood, then OR, then all<br/>(skipped when songs are liked)"]
+    score["2. Scoring<br/>points per factor, incl. similarity to liked songs"]
+    div["3. Diversity ranking<br/>artist-repeat penalty, top k"]
+    rules["4. Rule-based explanation"]
+    llm["AI writer (optional)<br/>facts of one pick only"]
+    guard{"Guardrail<br/>text vs score breakdown"}
+    cards["Result cards<br/>score bar + explanation"]
+
+    taste --> retr
+    liked --> score
+    catalog --> score
+    retr --> score --> div --> rules
+    div -- facts --> llm --> guard
+    guard -- passes --> cards
+    guard -- fails --> rules
+    rules -- fallback / AI off --> cards
+
+    subgraph Evidence
+      e1["Baselines and ablation"]
+      e2["Weight tuning and sensitivity"]
+      e3["Synthetic listeners: genre taste, audio taste (MUSIC-model archetypes)"]
+      e4["Real listeners: opt-in taste files"]
+      e5["Guardrail test suite"]
     end
-
-    subgraph Data["Catalog data"]
-        SMALL[("Small demo<br/>50 songs")]
-        LARGE[("Large catalog<br/>1,985 songs")]
-        APP --> SMALL
-        APP --> LARGE
-        CLI --> SMALL
-    end
-
-    subgraph Core["Shared recommender - src/recommender.py"]
-        LOAD["Load selected catalog"]
-        RETRIEVE["Retrieve candidates<br/>genre/mood filter + relaxation<br/>or full catalog with liked songs"]
-        SCORE["Score candidates<br/>rules + optional liked-song similarity"]
-        DIVERSE["Rank with artist diversity"]
-        EXPLAIN["Explain recommendations"]
-        LOAD --> RETRIEVE --> SCORE --> DIVERSE --> EXPLAIN
-    end
-
-    SMALL --> LOAD
-    LARGE --> LOAD
-    APP -->|"preferences + liked IDs"| RETRIEVE
-    CLI -->|"profile"| RETRIEVE
-    EXPLAIN --> OUT["Recommendations<br/>scores, reasons, retrieval details"]
-
-    subgraph Evaluation["Offline experiments - not used by the app"]
-        ARCH["Synthetic archetypes<br/>10 groups, 60 listener draws"]
-        EXP["v1–v4 baselines,<br/>ablations & trade-off tests"]
-        METRICS["Metrics + grouped validation"]
-        REPORT["Reports<br/>reports/*.md"]
-        ARCH --> EXP --> METRICS --> REPORT
-        LARGE -. "evaluation catalog" .-> EXP
-    end
-
-    BUILD["Optional catalog builder<br/>scripts/build_catalog.py<br/>external source CSV"]
-    BUILD -. "builds" .-> LARGE
-
-    classDef input fill:#f3e8ff,stroke:#7e22ce,color:#1f1235
-    classDef data fill:#e0f2fe,stroke:#0369a1,color:#082f49
-    classDef process fill:#dcfce7,stroke:#15803d,color:#052e16
-    classDef output fill:#fef3c7,stroke:#b45309,color:#451a03
-    class U,APP,CLI input
-    class SMALL,LARGE,ARCH data
-    class LOAD,RETRIEVE,SCORE,DIVERSE,EXPLAIN,EXP,METRICS,BUILD process
-    class OUT,REPORT output

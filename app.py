@@ -7,9 +7,13 @@ This app imports and runs the real recommender (src/recommender.py); it has
 no scoring logic of its own.
 """
 import html
+import json
+import os
 
 import streamlit as st
 
+from src.explain_llm import AnthropicClient, GuardVocab, build_facts, explain_from_facts
+from src.real_listeners import MAX_LIKED, MIN_LIKED, build_taste_file
 from src.recommender import load_songs, recommend_detailed
 
 st.set_page_config(page_title="VibeFinder", page_icon="🎧", layout="wide")
@@ -57,6 +61,19 @@ CATALOGS = {
 @st.cache_data
 def get_songs(path):
     return load_songs(path)
+
+
+@st.cache_resource
+def get_llm_client():
+    """One client for the session; raises RuntimeError with a clear message if not configured."""
+    return AnthropicClient()
+
+
+@st.cache_data(show_spinner=False)
+def ai_explanation(facts_json, fallback, catalog_path):
+    """Cached by the facts, so changing an unrelated widget does not call the API again."""
+    vocab = GuardVocab.from_songs(get_songs(catalog_path))
+    return explain_from_facts(json.loads(facts_json), fallback, get_llm_client(), vocab)
 
 
 st.session_state.setdefault("catalog", "Small demo (50 songs)")
@@ -123,9 +140,32 @@ with st.sidebar:
     title_of = {s["id"]: f"{s['title']} ({s['artist']})" for s in songs}
     st.multiselect("Songs you already like (optional)", list(title_of), key="liked",
                    format_func=lambda i: title_of[i],
+                   max_selections=MAX_LIKED,
                    help="Recommendations will sound like these and never repeat them.")
 
     st.select_slider("Songs to show", options=[3, 5, 10], key="k")
+
+    st.checkbox("Write explanations with Claude", key="use_ai",
+                help="Claude writes each explanation from the score facts only. A checker compares the text "
+                     "with the score and falls back to the rule-based text if anything does not match. "
+                     "Needs ANTHROPIC_API_KEY and the anthropic package.")
+
+    with st.expander("Share your taste (for the evaluation)"):
+        large = st.session_state["catalog"].startswith("Large")
+        if not large:
+            st.caption("Switch to the Large catalog to share your taste.")
+        else:
+            st.caption(f"Add {MIN_LIKED} to {MAX_LIKED} songs you like under \u201cSongs you already like\u201d above. "
+                       "The file holds only song ids, titles, artists and the pseudonym you type. "
+                       "Nothing is uploaded: you download it and send it to the project owner.")
+            st.text_input("Pseudonym (not your real name or email)", key="nickname", max_chars=30)
+            n_liked = len(st.session_state["liked"])
+            if MIN_LIKED <= n_liked <= MAX_LIKED:
+                taste = build_taste_file(st.session_state.get("nickname"), st.session_state["liked"], songs)
+                st.download_button("Download my taste file", json.dumps(taste, indent=2, ensure_ascii=False),
+                                   file_name="my_taste.json", mime="application/json")
+            else:
+                st.caption(f"Choose {MIN_LIKED} to {MAX_LIKED} songs; {n_liked} selected.")
 
 prefs = {
     "genre": "" if st.session_state["genre"] == ANY else st.session_state["genre"],
@@ -151,6 +191,20 @@ for col, name in zip(preset_cols, PRESETS):
 
 detail = recommend_detailed(prefs, songs, k=st.session_state["k"])
 results = detail["results"]
+
+explanations = {}
+ai_note = None
+if st.session_state.get("use_ai"):
+    try:
+        get_llm_client()
+        for r in results:
+            facts_json = json.dumps(build_facts(r, prefs, songs), ensure_ascii=False, sort_keys=True)
+            explanations[r["song"]["id"]] = ai_explanation(facts_json, r["explanation"], CATALOGS[st.session_state["catalog"]])
+    except RuntimeError as err:
+        ai_note = str(err)
+
+if ai_note:
+    st.info(ai_note)
 
 c1, c2, c3 = st.columns(3)
 c1.metric("Songs in the catalog", len(songs))
@@ -202,7 +256,13 @@ for rank, r in enumerate(results, start=1):
             chips.append(f'<span style="color:gray">&#9632;</span> Repeat artist {MINUS}{r["penalty"]:.2f}')
         st.markdown(" &nbsp; ".join(chips), unsafe_allow_html=True)
 
-        st.write(r["explanation"].replace("$", "\\$"))
+        ex = explanations.get(r["song"]["id"])
+        st.write((ex.text if ex else r["explanation"]).replace("$", "\\$"))
+        if ex is not None:
+            if ex.source == "ai":
+                st.caption("Written by Claude and checked against the score.")
+            else:
+                st.caption("Rule-based text: the AI text was not used (" + (", ".join(ex.problems) or "no reason given") + ").")
 
 st.caption(
     "Scores come from a transparent rule-based model, not machine learning. "

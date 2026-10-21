@@ -4,7 +4,7 @@
 **Music Recommender Simulation** was a simple content-based recommender that suggests songs from user preferences for genre, mood and song features. The goal was to see how recommenders turn data into predictions, where bias creeps in, and how scoring choices change results.
 
 ## Summary
-This version turns that starter into a small, testable recommender with retrieval, scoring, diversity-aware ranking, and explanations. It filters a song catalog, scores candidates, selects a diverse list, and writes a plain-language explanation for every recommendation. It is rule-based on purpose, so every score can be traced and explained. It does not use machine learning or an LLM.
+This version turns that starter into a small, testable recommender with retrieval, scoring, diversity-aware ranking, and explanations. Song selection remains rule- and similarity-based so every score can be traced. Optionally, an AI service can write an explanation from the score facts; a local rule-based guardrail checks that text, and the app falls back to its rule-based explanation if the check fails or the API errors.
 
 ## Architecture
 ![System Architecture](diagrams/architecture.png)
@@ -12,13 +12,14 @@ This version turns that starter into a small, testable recommender with retrieva
 1. **Catalog selection and loading**: the Streamlit app selects the small or large CSV catalog; the CLI uses the small catalog. Both call the shared recommender.
 2. **Retrieval** (`retrieve_candidates`): normally narrows candidates by genre/mood and progressively relaxes the filter when needed. With liked songs, the default is to consider the full selected catalog.
 3. **Scoring and ranking** (`score_song`, `rank_with_diversity`): a shared score combines rule-based preferences with optional sound similarity to liked songs, then selects a diverse list with an artist-repeat penalty.
-4. **Explanation** (`explain_song`): provides reasons and similar-song suggestions. The app also displays scores and retrieval details.
+4. **Rule-based explanation** (`explain_song`): provides reasons and similar-song suggestions.
+5. **Optional AI writer and guardrail** (`src/explain_llm.py`): if enabled and configured, generates text from one recommendation's score facts and accepts it only when the local checks pass. Otherwise, the rule-based explanation is shown.
 
-Offline v1-v4 experiments use hand-labelled or synthetic evaluation listeners and produce metrics/reports; they are not part of the app's recommendation runtime. The v4 large-catalog protocols are synthetic, not real-user evidence. The optional catalog builder is a separate utility that turns a compatible external CSV into the checked-in large catalog.
+Offline v1-v5 experiments produce evaluation reports; they are separate from the app's recommendation runtime. Large-catalog results are synthetic until real listener files are collected. The optional catalog builder turns a compatible external CSV into the checked-in large catalog.
 
 `Recommender` (the OO class) is a thin wrapper over the same functions, so class tests and the CLI exercise identical logic.
 
-**Optional (v3/v4):** provide songs you already like and recommendations get a similarity bonus based on energy, valence, danceability, acousticness, and tempo. The app searches the full catalog rather than applying the genre/mood retrieval filter, excludes liked songs from results, and can explain which liked track sounds similar. The default similarity weight is a trade-off, not a proven optimum.
+**Optional (v3-v5):** provide songs you already like and recommendations get a similarity bonus based on energy, valence, danceability, acousticness, and tempo. The app searches the full catalog rather than applying the genre/mood retrieval filter, excludes liked songs from results, and can explain which liked track sounds similar. The default similarity weight is a trade-off, not a proven optimum.
 
 ## Getting Started
 Requires Python and pip. On Windows PowerShell:
@@ -27,6 +28,11 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install -r requirements-dev.txt  # needed for tests, experiments, and rebuilding the large catalog
+```
+
+To enable optional AI-written explanations in Windows PowerShell, set your Anthropic key in the current terminal session (do not commit it):
+```powershell
+$env:ANTHROPIC_API_KEY = "your-key"
 ```
 
 On macOS/Linux, activate the environment with `source .venv/bin/activate` instead. Then run commands from the project root:
@@ -40,29 +46,35 @@ python -m experiments.run_v1  # compare baselines and run the v1 ablation study
 python -m experiments.run_v2  # tune weights and measure sensitivity
 python -m experiments.run_v3  # evaluate similarity on the small hand-labelled catalog
 python -m experiments.run_v4  # compare rules/similarity under two large-catalog protocols
+python -m experiments.run_v5_guardrail  # test explanation checks without calling an AI service
+python -m experiments.run_v5_real  # evaluate taste files (none collected in this repo yet)
+python -m scripts.draw_architecture  # regenerate diagrams/architecture.png and .svg
 ```
 
 ## Streamlit App (`app.py`)
-The main frontend. It imports `src.recommender` directly (via `recommend_detailed`), so it shows exactly what the real system does, with no copy of the logic. Pick a catalog, genre, mood, energy, and optionally songs you already like. Recommendations show the score breakdown, retrieval funnel, repeat-artist penalty, and explanation. To deploy for free, push the repo to GitHub and create an app at share.streamlit.io pointing at `app.py`.
+The main frontend imports `src.recommender` directly (via `recommend_detailed`). Pick a catalog, genre, mood, energy, and optionally songs you already like. Recommendations show the score breakdown, retrieval funnel, repeat-artist penalty, and explanation. AI writing is off by default. When enabled, selected recommendation facts (including song/catalog text and taste preferences) are sent to Anthropic; the local guardrail either accepts the returned text or uses the rule-based fallback. Keep the API key out of source control. To deploy on Streamlit Community Cloud, add the key as an app secret only if you want the optional AI feature.
+
+The **Share your taste** panel exports a JSON file only after the user chooses to download it. Nothing is uploaded automatically. Ask participants for consent, use a pseudonym rather than a real name or email, and review the file before committing it.
 
 ## Static Web Demo (optional)
-A no-install, single-file copy lives in `docs/index.html`: pick a genre, mood and energy (or an example taste), and each recommendation shows a colour-coded score breakdown, the retrieval funnel (catalog, candidates, picks) and the written explanation.
+A no-install, single-file copy lives in `docs/index.html`: select either catalog, choose a genre/mood/energy and optionally liked songs, then inspect the score breakdown and explanation. It can download a taste file locally; it never calls the AI API, so its explanations remain rule-based.
 ```bash
-python scripts/build_web.py            # rebuild docs/index.html from web/ + data/songs.csv
-python scripts/check_web_parity.py     # confirm the JS engine ranks exactly like the Python one
+python -m scripts.build_web            # rebuild docs/index.html from web/ + both catalogs
+python -m scripts.check_web_parity     # compare the JS engine with Python
 python -m http.server -d docs 8000     # then open http://localhost:8000
 ```
 The parity check requires Node.js in addition to the Python dependencies.
 To host it free, go to GitHub, then Settings, then Pages, choose branch `main` and folder `/docs`.
 Unlike the Streamlit app, this page uses `web/engine.js`, a JavaScript port of `src/recommender.py`, so the page runs entirely in the browser with no server. If you change weights or ranking in Python, mirror the change in `web/engine.js` and re-run the parity check.
-The liked-song similarity feature is available in the Python recommender and Streamlit app; the static web demo does not include it.
+The page uses a JavaScript port in `web/engine.js`; CI checks the ranking parity and that `docs/index.html` is up to date.
 
 ## Data
 - `data/songs.csv`: 50 songs, 48 artists, 27 genres, with 10 columns (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). This is the small demo catalog.
 - `data/catalog_large.csv`: 1,985 tracks across 40 genres for the large-catalog app and synthetic experiments. Its mood labels are derived from energy and valence; hidden `gt_*` audio features are used only as evaluation ground truth and are not loaded by the recommender.
 - `data/songs_new.csv`: 20-song sample that also has `popularity`, `release_decade`, `detailed_mood`, `instrumentalness` and `language`. These optional columns are supported by the scorer but are not in the main catalog.
 - `data/eval_listeners.json`: hand-labelled listener seed songs and held-out liked songs for offline evaluation.
-- `data/eval_archetypes.json`: synthetic genre-based archetypes used to generate repeatable evaluation listeners.
+- `data/eval_archetypes.json`: synthetic archetypes based on five MUSIC-model preference factors. Genre-to-factor assignments include documented assumptions and source references.
+- `data/real_listeners/`: opt-in taste files for offline evaluation; the shipped example is explicitly marked as non-real and ignored.
 
 The large catalog was derived from a Spotify tracks dataset distributed through Kaggle. The original raw dataset is not included. To rebuild the catalog, obtain a compatible source file, review its license and terms, then run `python -m scripts.build_catalog path\to\dataset.csv`. The build tool requires the development dependencies. Check that the source terms permit redistribution before publishing the derived catalog.
 
@@ -117,22 +129,35 @@ In the Streamlit app, optionally select songs you already like. The recommender 
 
 On all seven labelled listeners, nearest-song similarity at weight 0.5 scored 0.593 NDCG@5 versus 0.586 for rules alone. In leave-one-listener-out testing, selecting among the candidate variants scored 0.549 versus 0.586 for rules alone. The small in-sample gain did not generalize. V4 therefore evaluates the feature as a trade-off under two synthetic large-catalog protocols rather than claiming improved real-user accuracy.
 
-## Larger Catalog and Synthetic Evaluation (v4)
-The 1,985-song catalog has no listening history, so the v4 evaluation uses 60 synthetic listeners (10 archetypes with six repeatable seed-song draws) under two deliberately different assumptions:
+## Larger Catalog and Synthetic Evaluation (v4/v5)
+The 1,985-song catalog has no listening history, so v4/v5 use 60 synthetic listeners (five research-based archetypes with 12 repeatable seed-song draws each) under two deliberately different assumptions:
 
-- **Genre taste:** a listener likes tracks in their archetype's listed genres; this favors genre-based rules.
+- **Genre taste:** a listener likes tracks in genres mapped to their archetype; this favors genre-based rules. The five archetypes represent the MUSIC-model factors; genre mappings use the published STOMP-R scoring key where available, and assumptions for unmapped genres are documented in `data/eval_archetypes.json`.
 - **Audio taste:** a listener likes the 100 tracks closest to their seed songs in a richer feature space, including speechiness, instrumentalness, liveness, and loudness. These hidden evaluation-only features are never supplied to the recommender; this favors similarity.
 
 | Method (NDCG@5) | Genre taste | Audio taste |
 |---|---:|---:|
-| Rules only | 0.953 | 0.238 |
-| Rules + centroid similarity (weight 3, no retrieval filter; shipped default) | 0.923 | 0.452 |
-| Rules + centroid similarity (weight 8, no retrieval filter; worst-case selection) | 0.618 | 0.664 |
-| Audio-feature nearest neighbours | 0.159 | 0.772 |
+| Random | 0.20 | 0.05 |
+| Energy only | 0.22 | 0.16 |
+| Genre only | 1.00 | 0.22 |
+| Audio-feature nearest neighbours | 0.30 | 0.76 |
+| Rules only | 0.92 | 0.24 |
+| Rules + similarity to liked songs (default blend) | 0.87 | 0.43 |
 
-No method wins under both assumptions. The default similarity blend gives up about 0.03 NDCG under genre taste for a 0.21 gain under audio taste, compared with rules alone. A predeclared worst-case rule would choose weight 8 instead, illustrating that the shipped weight is a design trade-off, not an empirically proven optimum. Full comparisons are in [reports/v4_results.md](reports/v4_results.md); v1 and v3 reports also include large-catalog variants.
+No method wins under both assumptions. The default blend gives up about 0.05 NDCG under genre taste for a 0.19 gain under audio taste, compared with rules alone. These are synthetic benchmarks, not real listener preference evidence. Full comparisons are in [reports/v4_results.md](reports/v4_results.md); v1 and v3 reports also include large-catalog variants.
 
-All large-catalog findings are synthetic and reflect the stated assumptions, not real user preferences. Since mood is derived from energy and valence, it is not independent human-labeled evidence. The static web demo remains on the small catalog and does not support the liked-song feature.
+Mood labels in the large catalog are derived from energy and valence, so they are not independent human-labeled evidence.
+
+## AI-Written Explanations with a Guardrail (v5)
+AI-written explanations are optional and off by default. If enabled and configured with `ANTHROPIC_API_KEY`, the app sends a small JSON containing one recommended song's details, the user's selected preferences, score factors, and (when applicable) the liked song it resembles to Anthropic. Song/catalog strings are cleaned first and are treated as untrusted data, not instructions. The model does not choose songs or change scores.
+
+A local heuristic guardrail checks the generated text for length/format, unsupported titles, artists, genres, moods and numbers, unsupported score claims, and whether it mentions a factor that earned points. If any check fails or the API request errors, the app displays the rule-based explanation instead. This is a defense-in-depth heuristic, not a guarantee that every false claim will be detected. Set `VIBEFINDER_LLM_MODEL` to use a different model supported by your Anthropic account. The guardrail experiment uses template-written examples, so its measured results do not establish real-model accuracy: see [reports/v5_guardrail.md](reports/v5_guardrail.md).
+
+## Real-Listener Evaluation (v5)
+Participants can choose 8 to 200 tracks from the large catalog and download a taste file. The file is not uploaded automatically; participants send it to the project owner, who can place consented files in `data/real_listeners/`. The evaluation validates catalog IDs and song names, holds out liked tracks, and reports skipped files. Run `python -m experiments.run_v5_real` to produce [reports/v5_real_listeners.md](reports/v5_real_listeners.md). No real listener files are included currently, so the checked-in report contains no real-listener findings. The static page also supports local taste-file download and never calls the AI API.
+
+## Continuous Integration (v5)
+GitHub Actions runs the test suite, evaluation guardrails, Python/JavaScript parity check, static-page rebuild check, and experiment smoke tests on Python 3.10-3.12. Dependabot checks Python and GitHub Actions dependencies. Dependencies use bounded version ranges; CI uploads the exact resolved `pip freeze` per Python version as an artifact.
 
 ## Reliability & Testing
 `tests/` includes parametrized reliability checks across six profiles and four values of `k`, as well as checks for:
@@ -148,7 +173,9 @@ All large-catalog findings are synthetic and reflect the stated assumptions, not
 - the v1 experiment and report cover baseline comparisons and ablations;
 - weight sampling is reproducible, ties prefer configurations near the defaults, and leave-one-listener-out validation excludes the held-out listener;
 - liked songs are excluded from results, similarity scoring and explanations work, and empty or unknown liked-song IDs preserve existing recommendations.
-- the large catalog is reproducible and clean, both synthetic listener protocols are valid, hidden ground-truth features do not leak to recommender scoring, and grouped validation resamples/holds out archetypes.
+- the large catalog is reproducible and clean, both synthetic listener protocols are valid, hidden ground-truth features do not leak to recommender scoring, and grouped validation resamples/holds out archetypes;
+- AI explanations use only one recommendation's sanitized facts, are checked against the score, and safely fall back on rejection or API errors;
+- taste-file export and validation handle consent-based real-listener submissions without uploading them automatically.
 
 ## Design Decisions and Trade-offs
 - **Interpretability over accuracy:** simple weights and rule-based explanations, at the cost of no collaborative filtering or learned taste.
@@ -159,7 +186,8 @@ All large-catalog findings are synthetic and reflect the stated assumptions, not
 ## Limitations and Responsible Use
 - The 50-song catalog is tiny and uneven. The large catalog is broader, but its moods are derived from audio features and its evaluation is synthetic, not real listener evidence.
 - Content-based scoring reinforces existing taste and can create filter bubbles. The diversity penalty only spreads artists, not genres.
-- Explanations are rule-based and describe the scoring, not the user's intent.
+- Rule-based explanations describe the scoring, not the user's intent. Optional AI text uses a third-party API and a heuristic guardrail that can miss subtle false claims.
+- Real-listener files are not included; collect them only with consent, avoid personally identifying pseudonyms, and consider privacy before storing or publishing them.
 - Intended for learning only, not for production streaming or high-stakes decisions.
 
 ## Collaboration with AI

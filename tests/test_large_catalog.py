@@ -47,8 +47,11 @@ def test_hidden_ground_truth_columns_never_reach_the_recommender():
 
 # ---- evaluation protocols -----------------------------------------------------------
 def test_archetype_listeners_are_well_formed_and_reproducible():
+    import json
+    cfg = json.load(open("data/eval_archetypes.json", encoding="utf-8"))
     a, b = archetype_listeners(LARGE), archetype_listeners(LARGE)
-    assert len(a) == 60 and len({l["group"] for l in a}) == 10
+    assert len(a) == len(cfg["archetypes"]) * cfg["draws_per_archetype"]
+    assert len({l["group"] for l in a}) == len(cfg["archetypes"])
     assert [[s["id"] for s in l["seeds"]] for l in a] == [[s["id"] for s in l["seeds"]] for l in b]
     for l in a:
         seed_ids = {s["id"] for s in l["seeds"]}
@@ -71,7 +74,7 @@ def test_genre_protocol_relevance_is_exactly_the_archetype_genres_minus_seeds():
 def test_audio_protocol_uses_a_fixed_size_neighbourhood_that_differs_from_genre():
     audio = audio_taste_listeners(LARGE, LARGE_CSV)
     genre = archetype_listeners(LARGE)
-    assert len(audio) == len(genre) == 60
+    assert len(audio) == len(genre) and len(audio) >= 50
     for la, lg in zip(audio, genre):
         assert len(la["relevant"]) == AUDIO_NEIGHBOURS
         assert {s["id"] for s in la["seeds"]}.isdisjoint(la["relevant"])
@@ -115,3 +118,16 @@ def test_filter_when_liked_switch_restores_the_old_behaviour():
     finally:
         rec.FILTER_WHEN_LIKED = saved
     assert detail["tier"] in {"both", "either", "fallback"}
+
+
+def test_every_catalog_genre_belongs_to_exactly_one_researched_factor():
+    import json
+    cfg = json.load(open("data/eval_archetypes.json", encoding="utf-8"))
+    mapped = [m["genre"] for m in cfg["mapping"]]
+    assert len(mapped) == len(set(mapped))
+    assert set(mapped) == {s["genre"] for s in LARGE}
+    assert {m["factor"] for m in cfg["mapping"]} == {a["name"] for a in cfg["archetypes"]}
+    assert all(m["basis"] for m in cfg["mapping"]) and len(cfg["sources"]) >= 2
+    # archetype genre lists are generated from the mapping, so they must agree
+    for a in cfg["archetypes"]:
+        assert set(a["genres"]) == {m["genre"] for m in cfg["mapping"] if m["factor"] == a["name"]}

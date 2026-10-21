@@ -1,18 +1,279 @@
 {
-  "_note": "Synthetic listeners for the large catalog. Each archetype likes every song in its genres (hand-chosen by listening context). A listener is built by drawing 3 seed songs the archetype already knows; the rest of its genres are the held-out relevant songs. Edit the genre lists to change the ground truth.",
+  "_note": "Synthetic listeners for the large catalog. Archetypes are the five MUSIC preference factors (Rentfrow, Goldberg & Levitin, 2011); catalog genres are assigned to factors using the STOMP-R scoring key published by the Gosling lab, with documented assumptions where a catalog genre is not in the key. A listener is built by drawing seed songs from an archetype's genres; the rest of its genres are the held-out relevant songs.",
+  "sources": [
+    "Rentfrow, P. J., Goldberg, L. R., & Levitin, D. J. (2011). The structure of musical preferences: A five-factor model. Journal of Personality and Social Psychology, 100(6), 1139-1157.",
+    "STOMP-R scoring key (five-factor genre groupings), Gosling lab, University of Texas at Austin: https://gosling.psy.utexas.edu/scales-weve-developed/short-test-of-music-preferences-stomp/"
+  ],
   "seeds_per_listener": 3,
-  "draws_per_archetype": 6,
+  "draws_per_archetype": 12,
   "random_seed": 21,
   "archetypes": [
-    {"name": "Study and focus", "genres": ["ambient", "classical", "piano", "new-age"]},
-    {"name": "Gym workout", "genres": ["heavy-metal", "hard-rock", "edm", "drum-and-bass"]},
-    {"name": "Dance floor", "genres": ["house", "techno", "trance", "disco"]},
-    {"name": "Latin party", "genres": ["reggaeton", "salsa", "latin", "samba"]},
-    {"name": "Americana road trip", "genres": ["country", "bluegrass", "folk", "singer-songwriter"]},
-    {"name": "Late-night jazz and soul", "genres": ["jazz", "blues", "soul", "r-n-b"]},
-    {"name": "Pop radio", "genres": ["pop", "k-pop", "synth-pop", "indie-pop"]},
-    {"name": "Indie and alternative", "genres": ["indie", "alt-rock", "punk-rock", "trip-hop"]},
-    {"name": "Island sunshine", "genres": ["reggae", "afrobeat", "ska", "dancehall"]},
-    {"name": "Beats and groove", "genres": ["hip-hop", "funk", "r-n-b", "gospel"]}
+    {
+      "name": "Mellow",
+      "genres": [
+        "house",
+        "techno",
+        "trance",
+        "edm",
+        "drum-and-bass",
+        "trip-hop",
+        "new-age",
+        "ambient",
+        "afrobeat",
+        "samba",
+        "salsa",
+        "latin"
+      ]
+    },
+    {
+      "name": "Unpretentious",
+      "genres": [
+        "pop",
+        "indie-pop",
+        "k-pop",
+        "synth-pop",
+        "country",
+        "singer-songwriter"
+      ]
+    },
+    {
+      "name": "Sophisticated",
+      "genres": [
+        "blues",
+        "jazz",
+        "bluegrass",
+        "folk",
+        "classical",
+        "gospel",
+        "piano"
+      ]
+    },
+    {
+      "name": "Intense",
+      "genres": [
+        "rock",
+        "punk-rock",
+        "heavy-metal",
+        "hard-rock",
+        "alt-rock",
+        "indie"
+      ]
+    },
+    {
+      "name": "Contemporary",
+      "genres": [
+        "hip-hop",
+        "r-n-b",
+        "soul",
+        "funk",
+        "reggae",
+        "reggaeton",
+        "dancehall",
+        "ska",
+        "disco"
+      ]
+    }
+  ],
+  "mapping": [
+    {
+      "genre": "house",
+      "factor": "Mellow",
+      "basis": "listed in the STOMP-R key (electronica/dance)"
+    },
+    {
+      "genre": "techno",
+      "factor": "Mellow",
+      "basis": "listed in the STOMP-R key (electronica/dance)"
+    },
+    {
+      "genre": "trance",
+      "factor": "Mellow",
+      "basis": "listed in the STOMP-R key (electronica/dance)"
+    },
+    {
+      "genre": "edm",
+      "factor": "Mellow",
+      "basis": "listed in the STOMP-R key (electronica/dance)"
+    },
+    {
+      "genre": "drum-and-bass",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: electronica/dance"
+    },
+    {
+      "genre": "trip-hop",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: electronica/dance"
+    },
+    {
+      "genre": "new-age",
+      "factor": "Mellow",
+      "basis": "listed in the STOMP-R key (new age)"
+    },
+    {
+      "genre": "ambient",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: new age"
+    },
+    {
+      "genre": "afrobeat",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: world"
+    },
+    {
+      "genre": "samba",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: world"
+    },
+    {
+      "genre": "salsa",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: world"
+    },
+    {
+      "genre": "latin",
+      "factor": "Mellow",
+      "basis": "assumption: nearest listed genre: world"
+    },
+    {
+      "genre": "pop",
+      "factor": "Unpretentious",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "indie-pop",
+      "factor": "Unpretentious",
+      "basis": "assumption: nearest listed genre: pop"
+    },
+    {
+      "genre": "k-pop",
+      "factor": "Unpretentious",
+      "basis": "assumption: nearest listed genre: pop"
+    },
+    {
+      "genre": "synth-pop",
+      "factor": "Unpretentious",
+      "basis": "assumption: nearest listed genre: pop"
+    },
+    {
+      "genre": "country",
+      "factor": "Unpretentious",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "singer-songwriter",
+      "factor": "Unpretentious",
+      "basis": "named in the 2011 paper's abstract as typical of this factor"
+    },
+    {
+      "genre": "blues",
+      "factor": "Sophisticated",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "jazz",
+      "factor": "Sophisticated",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "bluegrass",
+      "factor": "Sophisticated",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "folk",
+      "factor": "Sophisticated",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "classical",
+      "factor": "Sophisticated",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "gospel",
+      "factor": "Sophisticated",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "piano",
+      "factor": "Sophisticated",
+      "basis": "assumption: nearest listed genre: classical"
+    },
+    {
+      "genre": "rock",
+      "factor": "Intense",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "punk-rock",
+      "factor": "Intense",
+      "basis": "listed in the STOMP-R key (punk)"
+    },
+    {
+      "genre": "heavy-metal",
+      "factor": "Intense",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "hard-rock",
+      "factor": "Intense",
+      "basis": "assumption: nearest listed genre: rock"
+    },
+    {
+      "genre": "alt-rock",
+      "factor": "Intense",
+      "basis": "listed in the STOMP-R key (alternative)"
+    },
+    {
+      "genre": "indie",
+      "factor": "Intense",
+      "basis": "assumption: nearest listed genre: alternative"
+    },
+    {
+      "genre": "hip-hop",
+      "factor": "Contemporary",
+      "basis": "listed in the STOMP-R key (rap)"
+    },
+    {
+      "genre": "r-n-b",
+      "factor": "Contemporary",
+      "basis": "listed in the STOMP-R key (soul/r&b)"
+    },
+    {
+      "genre": "soul",
+      "factor": "Contemporary",
+      "basis": "listed in the STOMP-R key (soul/r&b)"
+    },
+    {
+      "genre": "funk",
+      "factor": "Contemporary",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "reggae",
+      "factor": "Contemporary",
+      "basis": "listed in the STOMP-R key"
+    },
+    {
+      "genre": "reggaeton",
+      "factor": "Contemporary",
+      "basis": "assumption: nearest listed genre: reggae/rap"
+    },
+    {
+      "genre": "dancehall",
+      "factor": "Contemporary",
+      "basis": "assumption: nearest listed genre: reggae"
+    },
+    {
+      "genre": "ska",
+      "factor": "Contemporary",
+      "basis": "assumption: nearest listed genre: reggae"
+    },
+    {
+      "genre": "disco",
+      "factor": "Contemporary",
+      "basis": "assumption: nearest listed genre: funk"
+    }
   ]
 }
