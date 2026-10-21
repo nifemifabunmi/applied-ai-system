@@ -2,4 +2,4 @@
 -r requirements.txt
 pytest>=8,<9
 pandas>=2.2,<4            # rebuilding the large catalog
-matplotlib>=3.9,<4        # experiment charts and the architecture diagram
+matplotlib>=3.11.2,<4        # experiment charts and the architecture diagram
